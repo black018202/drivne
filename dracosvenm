@@ -1,0 +1,411 @@
+-- VERIFICAÇÃO DE PERMISSÃO (SISTEMA VIP)
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+
+local UsuariosPermitidos = {
+    ["Black_123287"] = true,
+    ["Usuario2"] = true,
+    ["Usuario3"] = true,
+    ["Usuario4"] = true,
+    ["Usuario5"] = true,
+    ["Usuario6"] = true,
+    ["Usuario7"] = true,
+    ["Usuario8"] = true,
+    ["Usuario9"] = true,
+    ["Usuario10"] = true,
+}
+
+if not (UsuariosPermitidos[LocalPlayer.Name] or UsuariosPermitidos[LocalPlayer.DisplayName]) then
+    pcall(function()
+        game:GetService("StarterGui"):SetCore("SendNotification", {
+            Title = "Acesso Negado",
+            Text = "Você não tem permissão para usar este script.",
+            Duration = 5
+        })
+    end)
+    warn("Acesso negado para: " .. LocalPlayer.Name)
+    return
+end
+
+-- FIX PARA DUPLICIDADE: Limpa a interface e desativa os loops em segundo plano do script antigo
+if getgenv().DesativarScriptAntigo then
+    getgenv().DesativarScriptAntigo()
+end
+
+if game:GetService("CoreGui"):FindFirstChild("Rayfield") then
+    game:GetService("CoreGui").Rayfield:Destroy()
+end
+
+getgenv().DesativarScriptAntigo = function()
+    if getgenv().ConexaoVelocidade then
+        getgenv().ConexaoVelocidade:Disconnect()
+        getgenv().ConexaoVelocidade = nil
+    end
+    getgenv().AutoAttackRodando = false
+end
+
+getgenv().AutoAttackRodando = true
+
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local TweenService = game:GetService("TweenService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local RunService = game:GetService("RunService")
+
+local Window = Rayfield:CreateWindow({
+   Name = "Menu",
+   LoadingTitle = "LOADING",
+   LoadingSubtitle = "Dracosw👑",
+   ConfigurationSaving = {
+       Enabled = true,
+       FolderName = "RayfieldConfig",
+       FileName = "MinhaConfig"
+   },
+   Discord = { Enabled = false },
+   KeySystem = false
+})
+
+-----------------------------------------------------------
+-- PRIMEIRAS ABAS (COMBAT E MOVIMENTAÇÃO)
+-----------------------------------------------------------
+local TabCombat = Window:CreateTab("Combat", 0)
+local TabMove = Window:CreateTab("Movimentação", 0)
+
+-----------------------------------------------------------
+-- PARTE 1: AUTO ATTACK (ALVO FIXO + OFFSET SÓ SE ANDAR)
+-----------------------------------------------------------
+local autoAttackActive = false
+local currentTween = nil
+local TWEEN_SPEED = 38
+local lockedTarget = nil
+local OFFSET_STUDS = 2 -- Alterado para 2 studs como padrão
+
+local function getClosestPlayer()
+    local closestPlayer = nil
+    local shortestDistance = math.huge
+    local myChar = LocalPlayer.Character
+    if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return nil end
+    local myPos = myChar.HumanoidRootPart.Position
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
+            local dist = (player.Character.HumanoidRootPart.Position - myPos).Magnitude
+            if dist < shortestDistance then 
+                shortestDistance = dist 
+                closestPlayer = player 
+            end
+        end
+    end
+    return closestPlayer
+end
+
+local function equipBat()
+    local character = LocalPlayer.Character
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if not character or not backpack then return end
+    for _, item in pairs(character:GetChildren()) do
+        if item:IsA("Tool") and (item.Name:lower():find("bast") or item.Name:lower():find("bat")) then return item end
+    end
+    for _, item in pairs(backpack:GetChildren()) do
+        if item:IsA("Tool") and (item.Name:lower():find("bast") or item.Name:lower():find("bat")) then
+            item.Parent = character
+            return item
+        end
+    end
+end
+
+local function startAutoAttack()
+    lockedTarget = getClosestPlayer()
+    
+    task.spawn(function()
+        while autoAttackActive and lockedTarget and getgenv().AutoAttackRodando do
+            if lockedTarget.Character and lockedTarget.Character:FindFirstChild("HumanoidRootPart") and lockedTarget.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
+                local myChar = LocalPlayer.Character
+                if myChar and myChar:FindFirstChild("HumanoidRootPart") then
+                    equipBat()
+                    
+                    local targetHRP = lockedTarget.Character.HumanoidRootPart
+                    local targetHumanoid = lockedTarget.Character:FindFirstChildOfClass("Humanoid")
+                    local targetCFrame = targetHRP.CFrame
+                    
+                    -- Se o alvo estiver andando, aplica a distância configurada no slider (OFFSET_STUDS)
+                    if targetHumanoid and targetHumanoid.MoveDirection.Magnitude > 0 then
+                        targetCFrame = targetHRP.CFrame * CFrame.new(0, 0, -OFFSET_STUDS)
+                    end
+                    
+                    local distance = (targetCFrame.Position - myChar.HumanoidRootPart.Position).Magnitude
+                    local tweenTime = distance / TWEEN_SPEED
+                    local tweenInfo = TweenInfo.new(tweenTime, Enum.EasingStyle.Linear)
+                    
+                    currentTween = TweenService:Create(myChar.HumanoidRootPart, tweenInfo, {CFrame = targetCFrame})
+                    currentTween:Play()
+                    
+                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
+                    task.wait(0.05)
+                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+                end
+            else
+                break
+            end
+            task.wait(0.1)
+        end
+        
+        if currentTween then currentTween:Cancel() end
+    end)
+end
+
+TabCombat:CreateToggle({
+   Name = "Auto Attack Player (Tecla R)",
+   CurrentValue = false,
+   Flag = "AutoAttackFlag",
+   Callback = function(Value)
+      autoAttackActive = Value
+      if autoAttackActive then 
+          startAutoAttack() 
+      else
+          lockedTarget = nil
+          if currentTween then currentTween:Cancel() end
+      end
+   end,
+})
+
+TabCombat:CreateKeybind({
+   Name = "Ativar/Desativar no R",
+   CurrentKeybind = "R",
+   Flag = "AttackKeybind",
+   Callback = function()
+      local Toggle = Rayfield.Flags["AutoAttackFlag"]
+      Toggle:Set(not Toggle.CurrentValue)
+   end,
+})
+
+TabCombat:CreateSlider({
+   Name = "Velocidade do Tween (Auto Attack)",
+   Range = {10, 100},
+   Increment = 1,
+   Suffix = " Speed",
+   CurrentValue = 38,
+   Flag = "TweenSpeedFlag",
+   Callback = function(Value)
+      TWEEN_SPEED = Value
+   end,
+})
+
+-- SLIDER ADICIONADO PARA AJUSTAR A DISTÂNCIA À FRENTE (STUDS)
+TabCombat:CreateSlider({
+   Name = "Distância à Frente em Movimento (Studs)",
+   Range = {1, 10},
+   Increment = 1,
+   Suffix = " Studs",
+   CurrentValue = 2,
+   Flag = "OffsetStudsFlag",
+   Callback = function(Value)
+      OFFSET_STUDS = Value
+   end,
+})
+
+-----------------------------------------------------------
+-- PARTE 2: VELOCIDADE SEM DESLIZAR
+-----------------------------------------------------------
+local speedValue = 16
+local isSpeedEnabled = false
+
+getgenv().ConexaoVelocidade = RunService.RenderStepped:Connect(function()
+    if isSpeedEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+        local root = LocalPlayer.Character.HumanoidRootPart
+        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        
+        if humanoid then
+            local moveDir = humanoid.MoveDirection
+            if moveDir.Magnitude > 0 then
+                root.AssemblyLinearVelocity = Vector3.new(moveDir.X * speedValue, root.AssemblyLinearVelocity.Y, moveDir.Z * speedValue)
+            else
+                root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+            end
+        end
+    end
+end)
+
+TabMove:CreateToggle({
+    Name = "Ativar Velocidade Custom",
+    CurrentValue = false,
+    Flag = "SpeedFlag",
+    Callback = function(Value)
+        isSpeedEnabled = Value
+        if not Value and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+            LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = 16
+        end
+    end
+})
+
+TabMove:CreateKeybind({
+   Name = "Ativar/Desativar Velocidade no F",
+   CurrentKeybind = "F",
+   Flag = "SpeedKeybind",
+   Callback = function()
+      local Toggle = Rayfield.Flags["SpeedFlag"]
+      Toggle:Set(not Toggle.CurrentValue)
+   end,
+})
+
+TabMove:CreateSlider({
+   Name = "Velocidade (WalkSpeed)",
+   Range = {16, 60},
+   Increment = 1,
+   Suffix = " Speed",
+   CurrentValue = 16,
+   Flag = "PlayerWalkSpeed",
+   Callback = function(Value)
+      speedValue = Value
+      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+          LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = Value
+      end
+   end,
+})
+
+-----------------------------------------------------------
+-- PARTE 3: DESCIDA COM PLATAFORMA (SISTEMA RAYFIELD)
+-----------------------------------------------------------
+local ativadoDescida = false
+local plataformaGigante = nil
+local connectionNoClip = nil
+local DISTANCIA_DESCIDA = 25
+local TAMANHO_PLATAFORMA = Vector3.new(2000, 2, 2000)
+
+local function habilitarNoClip()
+    connectionNoClip = RunService.Stepped:Connect(function()
+        local character = LocalPlayer.Character
+        if character and ativadoDescida then
+            for _, part in pairs(character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CanCollide = false
+                end
+            end
+        end
+    end)
+end
+
+local function desabilitarNoClip()
+    if connectionNoClip then
+        connectionNoClip:Disconnect()
+        connectionNoClip = nil
+    end
+    local character = LocalPlayer.Character
+    if character then
+        for _, part in pairs(character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                part.CanCollide = true
+            end
+        end
+    end
+end
+
+local function criarPlataforma(posicaoY)
+    local part = Instance.new("Part")
+    part.Size = TAMANHO_PLATAFORMA
+    part.CFrame = CFrame.new(0, posicaoY, 0)
+    part.Anchored = true
+    part.CanCollide = true
+    part.Material = Enum.Material.SmoothPlastic
+    part.Color = Color3.fromRGB(0, 170, 255)
+    part.Transparency = 0.4
+    part.Parent = workspace
+    return part
+end
+
+local function alternarDescida(estado)
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    local hrp = character.HumanoidRootPart
+
+    if estado then
+        ativadoDescida = true
+        habilitarNoClip()
+        hrp.CFrame = hrp.CFrame - Vector3.new(0, DISTANCIA_DESCIDA, 0)
+        plataformaGigante = criarPlataforma(hrp.Position.Y - 3)
+    else
+        ativadoDescida = false
+        desabilitarNoClip()
+        if plataformaGigante then
+            plataformaGigante:Destroy()
+            plataformaGigante = nil
+        end
+        hrp.CFrame = hrp.CFrame + Vector3.new(0, DISTANCIA_DESCIDA, 0)
+    end
+end
+
+TabMove:CreateToggle({
+   Name = "Descida + Plataforma",
+   CurrentValue = false,
+   Flag = "DescidaFlag",
+   Callback = function(Value)
+      alternarDescida(Value)
+   end,
+})
+
+TabMove:CreateKeybind({
+   Name = "Ativar/Desativar no Q",
+   CurrentKeybind = "Q",
+   Flag = "DescidaKeybind",
+   Callback = function()
+      local Toggle = Rayfield.Flags["DescidaFlag"]
+      Toggle:Set(not Toggle.CurrentValue)
+   end,
+})
+
+-----------------------------------------------------------
+-- ABA CONFIG ⚙️ (ÚLTIMA ABA DAS CONFIGURAÇÕES)
+-----------------------------------------------------------
+local TabConfig = Window:CreateTab("Config ⚙️", 0)
+
+TabConfig:CreateSection("LOAD HUD")
+
+TabConfig:CreateButton({
+   Name = "LOAD CONFIG",
+   Callback = function()
+       Rayfield:LoadConfiguration()
+       Rayfield:Notify({
+           Title = "Configurações",
+           Content = "HUD carregado com sucesso!",
+           Duration = 3,
+           Image = 4483362458,
+       })
+   end,
+})
+
+TabConfig:CreateSection("OUTRAS OPÇÕES")
+
+TabConfig:CreateDropdown({
+   Name = "Gerenciar HUD",
+   Options = {"⬇️", "Salvar HUD", "Deletar HUD"},
+   CurrentOption = {"⬇️"},
+   MultipleOptions = false,
+   Flag = "GerenciadorHUDDropdown",
+   Callback = function(Option)
+      local selecionado = type(Option) == "table" and Option[1] or Option
+      
+      if selecionado == "Salvar HUD" then
+          Rayfield:Notify({
+              Title = "Configurações",
+              Content = "Configurações do HUD salvas com sucesso!",
+              Duration = 3,
+              Image = 4483362458,
+          })
+      elseif selecionado == "Deletar HUD" then
+          if readfile and isfile and isfile("RayfieldConfig/MinhaConfig.rfld") then
+              delfile("RayfieldConfig/MinhaConfig.rfld")
+              Rayfield:Notify({
+                  Title = "Configurações",
+                  Content = "Arquivo de configuração deletado!",
+                  Duration = 3,
+                  Image = 4483362458,
+              })
+          else
+              Rayfield:Notify({
+                  Title = "Aviso",
+                  Content = "Nenhum arquivo de configuração encontrado para deletar.",
+                  Duration = 3,
+                  Image = 4483362458,
+              })
+          end
+      end
+   end,
+})
