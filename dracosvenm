@@ -11,7 +11,7 @@ local HttpService = game:GetService("HttpService")
 local config = {
     autoDive = false,
     infStamina = false,
-    staminaMode = 1, -- 1 = Normal, 2 = Stamina
+    staminaMode = 1,
     staminaActiveTime = 5,
     staminaDeactiveTime = 3,
     aimbotBall = false,
@@ -21,8 +21,8 @@ local config = {
     keybindT = true,
     keybindAimbot = true,
     aimbotKey = "R",
-    kickMessage = "Você saiu do jogo.",
-    cmdPassword = "anexushl" -- Senha salva automaticamente
+    kickMessage = "Você foi removido do jogo.",
+    cmdPassword = "anexushl"
 }
 
 local function saveConfig()
@@ -61,23 +61,19 @@ local y,z=26,16
 local speedValue=config.speedValue
 local A={}
 local tentandoReconectar=false
-
 local effectiveStaminaActive = false
 
--- Loop dedicado de Stamina
 task.spawn(function()
     while true do
         if m then
             if staminaMode == 2 then
                 effectiveStaminaActive = true
                 task.wait(staminaActiveTime)
-                
                 if not m or staminaMode ~= 2 then 
                     effectiveStaminaActive = false
                     task.wait(0.2)
                     continue 
                 end
-                
                 effectiveStaminaActive = false
                 task.wait(staminaDeactiveTime)
             else
@@ -96,7 +92,6 @@ local function obterBolaReal()
     if bolaCache and bolaCache:IsDescendantOf(i) and bolaCache:IsA("BasePart") and not bolaCache.Anchored then
         return bolaCache
     end
-    
     local possivelBola = i:FindFirstChild("TPS") or i:FindFirstChild("Ball") or i:FindFirstChild("Football")
     if possivelBola then
         if possivelBola:IsA("BasePart") and not possivelBola.Anchored then
@@ -107,7 +102,6 @@ local function obterBolaReal()
             return possivelBola.PrimaryPart
         end
     end
-
     for _, obj in ipairs(i:GetChildren()) do
         local nome = obj.Name:lower()
         if (nome == "ball" or nome == "tps" or nome == "football" or nome == "bola" or nome:find("matchball")) then
@@ -123,7 +117,6 @@ local function obterBolaReal()
             end
         end
     end
-    
     bolaCache = nil
     return nil
 end
@@ -131,13 +124,10 @@ end
 local function executarAimbotBall()
     local char = k.Character
     if not char then return end
-    
     local hrp = char:FindFirstChild(a[11])
     if not hrp then return end
-    
     local bola = obterBolaReal()
     if not bola then return end
-    
     local lookAtPos = Vector3.new(bola.Position.X, hrp.Position.Y, bola.Position.Z)
     hrp.CFrame = CFrame.new(hrp.Position, lookAtPos)
 end
@@ -153,7 +143,7 @@ local function tentarReconectar()
     end
 end
 
-tp.TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
+tp.TeleportInitFailed:Connect(function()
     tentandoReconectar = false
     task.wait(2)
     tp:Teleport(game.PlaceId, k)
@@ -529,12 +519,10 @@ d1("Keybind T","Enable/Disable T Key",config.keybindT,function(f3) o=f3 config.k
 addInfoRow("Anti Kick","Auto Rejoin",true)
 
 -- =====================================================================
--- PAINEL DE COMANDOS (Alt + W) - Com senha salva e seletor de jogadores do script
+-- PAINEL DE COMANDOS / SENHA & FUNÇÕES DE KICK / KILL
 -- =====================================================================
 do
     local UIS = d
-    local TweenService = e
-    local RunService = g
     local lp = k
     local PASSWORD = config.cmdPassword or "anexushl"
 
@@ -551,6 +539,7 @@ do
     local COR_BRANCO = Color3.fromRGB(255, 255, 255)
     local COR_CINZA = Color3.fromRGB(110, 120, 150)
     local COR_VERMELHO = Color3.fromRGB(200, 70, 70)
+    local COR_ROXO = Color3.fromRGB(150, 60, 200)
 
     local function newCorner(parent, radius)
         local c = Instance.new("UICorner")
@@ -623,11 +612,11 @@ do
     prompt.Visible = false
     newCorner(prompt, 8)
 
-    newText(prompt, "Acesso restrito", UDim2.new(0, 12, 0, 8), UDim2.new(1, -50, 0, 16), Enum.Font.GothamBold, COR_BRANCO, 13)
-    newText(prompt, "Digite a senha para liberar os comandos", UDim2.new(0, 12, 0, 26), UDim2.new(1, -24, 0, 12), Enum.Font.Gotham, Color3.fromRGB(120, 130, 160), 9)
+    newText(prompt, "Acesso Restrito", UDim2.new(0, 12, 0, 8), UDim2.new(1, -50, 0, 16), Enum.Font.GothamBold, COR_BRANCO, 13)
+    newText(prompt, "Digite a senha para acessar os comandos", UDim2.new(0, 12, 0, 26), UDim2.new(1, -24, 0, 12), Enum.Font.Gotham, Color3.fromRGB(120, 130, 160), 9)
 
     local promptClose = newButton(prompt, "X", UDim2.new(1, -30, 0, 6), UDim2.new(0, 20, 0, 20), Color3.fromRGB(25, 30, 45), 11)
-    local passBox = newBox(prompt, "", "Senha", UDim2.new(0, 12, 0, 48), UDim2.new(1, -24, 0, 28))
+    local passBox = newBox(prompt, "", "Senha...", UDim2.new(0, 12, 0, 48), UDim2.new(1, -24, 0, 28))
     passBox.TextSize = 12
     local errLabel = newText(prompt, "", UDim2.new(0, 12, 0, 80), UDim2.new(1, -24, 0, 12), Enum.Font.Gotham, COR_VERMELHO, 9)
     local enterBtn = newButton(prompt, "Entrar", UDim2.new(0, 12, 1, -34), UDim2.new(1, -24, 0, 24), COR_AZUL, 11)
@@ -638,15 +627,15 @@ do
         errLabel.Text = ""
     end)
 
-    -- ================= PAINEL GRANDE =================
+    -- ================= PAINEL PRINCIPAL =================
     local panel = Instance.new("Frame")
     panel.Name = "CommandsPanel"
     panel.Parent = cmdGui
     panel.BackgroundColor3 = COR_FUNDO
     panel.BorderColor3 = COR_BORDA
     panel.BorderSizePixel = 1
-    panel.Position = UDim2.new(0.5, -160, 0.5, -130)
-    panel.Size = UDim2.new(0, 320, 0, 270)
+    panel.Position = UDim2.new(0.5, -160, 0.5, -165)
+    panel.Size = UDim2.new(0, 320, 0, 340)
     panel.ClipsDescendants = true
     panel.Visible = false
     newCorner(panel, 8)
@@ -656,8 +645,8 @@ do
     header.Parent = panel
     header.BackgroundTransparency = 1
     header.Size = UDim2.new(1, 0, 0, 34)
-    newText(header, "COMANDOS & SCRIPT USERS", UDim2.new(0, 10, 0, 5), UDim2.new(0, 200, 0, 14), Enum.Font.GothamBold, COR_BRANCO, 13)
-    newText(header, "Selecione o alvo que usa o script", UDim2.new(0, 10, 0, 18), UDim2.new(0, 200, 0, 12), Enum.Font.Gotham, Color3.fromRGB(120, 130, 160), 9)
+    newText(header, "COMANDOS DE CONTROLE", UDim2.new(0, 10, 0, 5), UDim2.new(0, 200, 0, 14), Enum.Font.GothamBold, COR_BRANCO, 13)
+    newText(header, "Gerencie Kick e Kill do Alvo", UDim2.new(0, 10, 0, 18), UDim2.new(0, 200, 0, 12), Enum.Font.Gotham, Color3.fromRGB(120, 130, 160), 9)
 
     local panelClose = newButton(panel, "X", UDim2.new(1, -28, 0, 6), UDim2.new(0, 20, 0, 20), Color3.fromRGB(25, 30, 45), 11)
     panelClose.MouseButton1Click:Connect(function()
@@ -671,7 +660,7 @@ do
     content.BackgroundTransparency = 1
     content.Position = UDim2.new(0, 8, 0, 40)
     content.Size = UDim2.new(1, -16, 1, -48)
-    content.CanvasSize = UDim2.new(0, 0, 0, 240)
+    content.CanvasSize = UDim2.new(0, 0, 0, 330)
     content.ScrollBarThickness = 4
 
     local layout = Instance.new("UIListLayout")
@@ -679,92 +668,118 @@ do
     layout.SortOrder = Enum.SortOrder.LayoutOrder
     layout.Padding = UDim.new(0, 6)
 
-    -- Seção de Seleção de Usuários do Script
-    newText(content, "Jogadores com o Script no Servidor:", UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 14), Enum.Font.GothamBold, COR_BRANCO, 10)
+    -- Seção de Alvos
+    newText(content, "1. Selecionar Alvo do Servidor:", UDim2.new(0,0,0,0), UDim2.new(1,0,0,16), Enum.Font.GothamBold, COR_BRANCO, 11)
     
-    local dropdownBtn = newButton(content, "Nenhum usuário encontrado", UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 28), COR_CAIXA, 11)
-    
-    local playerListFrame = Instance.new("Frame")
-    playerListFrame.Parent = content
-    playerListFrame.BackgroundColor3 = Color3.fromRGB(22, 26, 40)
-    playerListFrame.Size = UDim2.new(1, 0, 0, 90)
-    playerListFrame.Visible = false
-    newCorner(playerListFrame, 5)
+    local targetListFrame = Instance.new("ScrollingFrame")
+    targetListFrame.Parent = content
+    targetListFrame.BackgroundColor3 = COR_CAIXA
+    targetListFrame.Size = UDim2.new(1, 0, 0, 90)
+    targetListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    targetListFrame.ScrollBarThickness = 3
+    newCorner(targetListFrame, 6)
 
-    local playerListScroll = Instance.new("ScrollingFrame")
-    playerListScroll.Parent = playerListFrame
-    playerListScroll.BackgroundTransparency = 1
-    playerListScroll.Size = UDim2.new(1, 0, 1, 0)
-    playerListScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
-    playerListScroll.ScrollBarThickness = 3
-    
-    local playerListLayout = Instance.new("UIListLayout")
-    playerListLayout.Parent = playerListScroll
-    playerListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    local targetListLayout = Instance.new("UIListLayout")
+    targetListLayout.Parent = targetListFrame
+    targetListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    targetListLayout.Padding = UDim.new(0, 2)
 
-    dropdownBtn.MouseButton1Click:Connect(function()
-        playerListFrame.Visible = not playerListFrame.Visible
-        -- Atualizar lista de jogadores com o script (procurando por um identificador no player, ex: UI ou pasta)
-        for _, child in ipairs(playerListScroll:GetChildren()) do
-            if child:IsA("TextButton") then child:Destroy() end
+    local function atualizarListaAlvos()
+        for _, child in ipairs(targetListFrame:GetChildren()) do
+            if child:IsA("TextButton") then
+                child:Destroy()
+            end
         end
 
         local count = 0
-        for _, p in ipairs(h:GetPlayers()) do
-            if p ~= lp and p.PlayerGui:FindFirstChild("ZenithMobileUI") then
-                count = count + 1
-                local pBtn = newButton(playerListScroll, p.Name, UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 24), Color3.fromRGB(30, 36, 55), 10)
-                pBtn.MouseButton1Click:Connect(function()
-                    selectedTarget = p
-                    dropdownBtn.Text = "Alvo: " .. p.Name
-                    playerListFrame.Visible = false
-                end)
-            end
+        for _, player in ipairs(h:GetPlayers()) do
+            count = count + 1
+            local btn = Instance.new("TextButton")
+            btn.Parent = targetListFrame
+            btn.BackgroundColor3 = (selectedTarget == player.Name) and COR_AZUL or Color3.fromRGB(22, 26, 40)
+            btn.Size = UDim2.new(1, -4, 0, 24)
+            btn.Font = Enum.Font.GothamBold
+            btn.Text = "  " .. player.Name .. (player == lp and " (Você)" or "")
+            btn.TextColor3 = COR_BRANCO
+            btn.TextSize = 10
+            btn.TextXAlignment = Enum.TextXAlignment.Left
+            newCorner(btn, 4)
+
+            btn.MouseButton1Click:Connect(function()
+                selectedTarget = player.Name
+                atualizarListaAlvos()
+            end)
         end
-        if count == 0 then
-            dropdownBtn.Text = "Nenhum outro usuário do script"
-            selectedTarget = nil
+        targetListFrame.CanvasSize = UDim2.new(0, 0, 0, count * 26)
+    end
+
+    h.PlayerAdded:Connect(atualizarListaAlvos)
+    h.PlayerRemoving:Connect(atualizarListaAlvos)
+
+    -- Seção de Ações (Kick e Kill)
+    newText(content, "2. Mensagem de Kick Personalizada:", UDim2.new(0,0,0,0), UDim2.new(1,0,0,16), Enum.Font.GothamBold, COR_BRANCO, 11)
+    local kickMsgBox = newBox(content, config.kickMessage, "Mensagem ao dar Kick...", UDim2.new(0,0,0,0), UDim2.new(1,0,0,28))
+    
+    kickMsgBox.FocusLost:Connect(function()
+        if kickMsgBox.Text ~= "" then
+            config.kickMessage = kickMsgBox.Text
+            saveConfig()
         end
-        playerListScroll.CanvasSize = UDim2.new(0, 0, 0, count * 24)
     end)
 
-    newText(content, "Ações nos Comandos:", UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 14), Enum.Font.GothamBold, COR_BRANCO, 10)
+    local kickBtn = newButton(content, "DAR KICK NO ALVO SELECIONADO", UDim2.new(0,0,0,0), UDim2.new(1,0,0,30), COR_VERMELHO, 11)
+    kickBtn.MouseButton1Click:Connect(function()
+        if not selectedTarget then return end
+        local alvoPlayer = h:FindFirstChild(selectedTarget)
+        if alvoPlayer and alvoPlayer == lp then
+            lp:Kick(config.kickMessage)
+        end
+    end)
 
-    local killBtn = newButton(content, "Executar Kill no Alvo Selecionado", UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 30), COR_VERMELHO, 11)
+    local killBtn = newButton(content, "DAR KILL NO ALVO SELECIONADO", UDim2.new(0,0,0,0), UDim2.new(1,0,0,30), COR_ROXO, 11)
     killBtn.MouseButton1Click:Connect(function()
-        if selectedTarget and selectedTarget.Character and selectedTarget.Character:FindFirstChild("Humanoid") then
-            selectedTarget.Character.Humanoid.Health = 0
-        end
-    end)
-
-    -- Atalho Alt + W para abrir
-    UIS.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        if input.KeyCode == Enum.KeyCode.W and (UIS:IsKeyDown(Enum.KeyCode.LeftAlt) or UIS:IsKeyDown(Enum.KeyCode.RightAlt)) then
-            if unlocked then
-                panelOpen = not panelOpen
-                panel.Visible = panelOpen
-            else
-                prompt.Visible = not prompt.Visible
+        if not selectedTarget then return end
+        local alvoPlayer = h:FindFirstChild(selectedTarget)
+        if alvoPlayer and alvoPlayer == lp then
+            local char = lp.Character
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then
+                    hum.Health = 0
+                end
             end
         end
     end)
 
-    enterBtn.MouseButton1Click:Connect(function()
+    local function validarSenha()
         if passBox.Text == PASSWORD then
             unlocked = true
             prompt.Visible = false
             passBox.Text = ""
             errLabel.Text = ""
-            
-            -- Salva a senha caso tenha sido alterada
-            config.cmdPassword = PASSWORD
-            saveConfig()
-
             panel.Visible = true
             panelOpen = true
+            atualizarListaAlvos()
         else
             errLabel.Text = "Senha incorreta!"
+        end
+    end
+
+    enterBtn.MouseButton1Click:Connect(validarSenha)
+
+    -- Atalho de teclado Alt + W
+    UIS.InputBegan:Connect(function(input)
+        if input.KeyCode == Enum.KeyCode.W and (UIS:IsKeyDown(Enum.KeyCode.LeftAlt) or UIS:IsKeyDown(Enum.KeyCode.RightAlt)) then
+            if not unlocked then
+                prompt.Visible = not prompt.Visible
+                errLabel.Text = ""
+            else
+                panelOpen = not panelOpen
+                panel.Visible = panelOpen
+                if panelOpen then
+                    atualizarListaAlvos()
+                end
+            end
         end
     end)
 end
