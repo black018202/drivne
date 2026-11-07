@@ -1,6 +1,6 @@
-local a={"UserInputService","TweenService","CoreGui","RunService","Players","Workspace","VirtualInputManager","TPS","Ball","Football","HumanoidRootPart","ScreenGui","Frame","UICorner","TextLabel","TextButton","UIListLayout","TextBox","TeleportService","GuiService","TextChatService"}
+local a={"UserInputService","TweenService","CoreGui","RunService","Players","Workspace","VirtualInputManager","TPS","Ball","Football","HumanoidRootPart","ScreenGui","Frame","UICorner","TextLabel","TextButton","UIListLayout","TextBox","TeleportService","GuiService"}
 local function b(c)return game:GetService(a[c])end
-local d,e,f,g,h,i,j,tp,gui,tcs=b(1),b(2),b(3),b(4),b(5),b(6),b(7),b(19),b(20),b(21)
+local d,e,f,g,h,i,j,tp,gui=b(1),b(2),b(3),b(4),b(5),b(6),b(7),b(19),b(20)
 local k=h.LocalPlayer
 
 if f:FindFirstChild("ZenithMobileUI") then f.ZenithMobileUI:Destroy() end
@@ -277,285 +277,7 @@ g.Heartbeat:Connect(function(T)
 end)
 
 -- =====================================================================
--- SISTEMA DE SINCRONIZAÇÃO DIRETA (WORKSPACE NETWORK)
--- =====================================================================
-task.spawn(function()
-    local networkFolder = i:FindFirstChild("ZenithScriptNetwork")
-    if not networkFolder then
-        networkFolder = Instance.new("Folder")
-        networkFolder.Name = "ZenithScriptNetwork"
-        networkFolder.Parent = i
-    end
-
-    -- Cria o canal próprio do jogador atual
-    local meuCanal = networkFolder:FindFirstChild(k.Name)
-    if not meuCanal then
-        meuCanal = Instance.new("StringValue")
-        meuCanal.Name = k.Name
-        meuCanal.Value = "IDLE"
-        meuCanal.Parent = networkFolder
-    end
-
-    -- Fica escutando se mandaram comando para este celular
-    meuCanal.Changed:Connect(function(valor)
-        if valor == "KILL" then
-            local char = k.Character
-            if char then
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                if hum then hum.Health = 0 end
-            end
-            meuCanal.Value = "IDLE"
-        elseif valor:find("^KICK:") then
-            local msg = valor:gsub("^KICK:", "")
-            k:Kick(msg ~= "" and msg or config.kickMessage)
-        end
-    end)
-end)
-
-local a8=Instance.new(a[12]) a8.Name="ZenithMobileUI" a8.Parent=f a8.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
-
-local a9=Instance.new(a[13]) a9.Name="MainFrame" a9.Parent=a8 
-a9.BackgroundColor3=Color3.fromRGB(15,18,28) 
-a9.BorderColor3=Color3.fromRGB(30,40,65) 
-a9.BorderSizePixel=1 
-a9.Position=UDim2.new(0.05,0,0.2,0) 
-a9.Size=UDim2.new(0,280,0,355) 
-a9.ClipsDescendants=true
-
-local b0=Instance.new(a[14]) b0.CornerRadius=UDim.new(0,8) b0.Parent=a9
-
-local b1,b2,b3,b4
-local function b5(b6)
-    local b7=b6.Position-b3 
-    a9.Position=UDim2.new(b4.X.Scale,b4.X.Offset+b7.X,b4.Y.Scale,b4.Y.Offset+b7.Y)
-end
-a9.InputBegan:Connect(function(b8)
-    if b8.UserInputType==Enum.UserInputType.MouseButton1 or b8.UserInputType==Enum.UserInputType.Touch then 
-        b1=true b3=b8.Position b4=a9.Position 
-        b8.Changed:Connect(function() if b8.UserInputState==Enum.UserInputState.End then b1=false end end)
-    end 
-end)
-a9.InputChanged:Connect(function(b9)
-    if b9.UserInputType==Enum.UserInputType.MouseMovement or b9.UserInputType==Enum.UserInputType.Touch then b2=b9 end 
-end)
-d.InputChanged:Connect(function(c0) if c0==b2 and b1 then b5(c0) end end)
-
-local c1=Instance.new(a[13]) c1.Name="Header" c1.Parent=a9 c1.BackgroundTransparency=1 c1.Size=UDim2.new(1,0,0,34)
-local c2=Instance.new(a[15]) c2.Parent=c1 c2.BackgroundTransparency=1 c2.Position=UDim2.new(0,10,0,5) c2.Size=UDim2.new(0,120,0,14) c2.Font=Enum.Font.GothamBold c2.Text="YTDRACOSWOR" c2.TextColor3=Color3.fromRGB(255,255,255) c2.TextSize=13 c2.TextXAlignment=Enum.TextXAlignment.Left
-local c3=Instance.new(a[15]) c3.Parent=c1 c3.BackgroundTransparency=1 c3.Position=UDim2.new(0,10,0,18) c3.Size=UDim2.new(0,120,0,12) c3.Font=Enum.Font.Gotham c3.Text="Goalkeeper" c3.TextColor3=Color3.fromRGB(120,130,160) c3.TextSize=9 c3.TextXAlignment=Enum.TextXAlignment.Left
-local c4=Instance.new(a[15]) c4.Parent=c1 c4.BackgroundTransparency=1 c4.Position=UDim2.new(1,-70,0,8) c4.Size=UDim2.new(0,40,0,16) c4.Font=Enum.Font.GothamBold c4.Text="v1.2.2" c4.TextColor3=Color3.fromRGB(60,180,140) c4.TextSize=10
-local c5=Instance.new(a[16]) c5.Name="MinimizeBtn" c5.Parent=c1 c5.BackgroundColor3=Color3.fromRGB(25,30,45) c5.Position=UDim2.new(1,-26,0,6) c5.Size=UDim2.new(0,20,0,20) c5.Font=Enum.Font.GothamBold c5.Text="-" c5.TextColor3=Color3.fromRGB(200,210,240) c5.TextSize=13
-local c6=Instance.new(a[14]) c6.CornerRadius=UDim.new(0,5) c6.Parent=c5
-
-local c7=Instance.new(a[13]) c7.Name="Container" c7.Parent=a9 c7.BackgroundTransparency=1 c7.Position=UDim2.new(0,8,0,36) c7.Size=UDim2.new(1,-16,1,-52)
-local c8=Instance.new(a[17]) c8.Parent=c7 c8.SortOrder=Enum.SortOrder.LayoutOrder c8.Padding=UDim.new(0,3)
-
-local c9=Instance.new(a[15]) c9.Name="CreditsLabel" c9.Parent=a9 c9.BackgroundTransparency=1 c9.Position=UDim2.new(0,0,1,-16) c9.Size=UDim2.new(1,0,0,14) c9.Font=Enum.Font.GothamBold c9.Text="Created by YT Dracoswor" c9.TextColor3=Color3.fromRGB(110,125,160) c9.TextSize=10 c9.TextXAlignment=Enum.TextXAlignment.Center
-
-c5.MouseButton1Click:Connect(function()
-    p=not p
-    local d0=p and UDim2.new(0,280,0,34) or UDim2.new(0,280,0,355)
-    c5.Text=p and "+" or "-"
-    c7.Visible=not p c9.Visible=not p
-    e:Create(a9,TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Size=d0}):Play()
-end)
-
-local function addSpacer(height)
-    local sp = Instance.new(a[13]) sp.Parent = c7 sp.BackgroundTransparency = 1 sp.Size = UDim2.new(1,0,0,height)
-end
-
-local function addInfoRow(d2, d3)
-    local d6=Instance.new(a[13]) d6.Parent=c7 d6.BackgroundColor3=Color3.fromRGB(22,26,40) d6.Size=UDim2.new(1,0,0,34)
-    local d7=Instance.new(a[14]) d7.CornerRadius=UDim.new(0,6) d7.Parent=d6
-    local d8=Instance.new(a[15]) d8.Parent=d6 d8.BackgroundTransparency=1 d8.Position=UDim2.new(0,8,0,3) d8.Font=Enum.Font.GothamBold d8.Text=d2 d8.TextColor3=Color3.fromRGB(255,255,255) d8.TextSize=11 d8.TextXAlignment=Enum.TextXAlignment.Left
-    local d9=Instance.new(a[15]) d9.Parent=d6 d9.BackgroundTransparency=1 d9.Position=UDim2.new(0,8,0,18) d9.Font=Enum.Font.Gotham d9.Text=d3 d9.TextColor3=Color3.fromRGB(110,120,150) d9.TextSize=9 d9.TextXAlignment=Enum.TextXAlignment.Left
-    
-    local st=Instance.new(a[15]) st.Parent=d6 st.BackgroundTransparency=1 st.Position=UDim2.new(1,-75,0,0) st.Size=UDim2.new(0,67,1,0) st.Font=Enum.Font.GothamBold st.Text="[Ativado]" st.TextColor3=Color3.fromRGB(60,180,140) st.TextSize=10 st.TextXAlignment=Enum.TextXAlignment.Right
-end
-
-local function d1(d2,d3,d4,d5)
-    local d6=Instance.new(a[13]) d6.Parent=c7 d6.BackgroundColor3=Color3.fromRGB(22,26,40) d6.Size=UDim2.new(1,0,0,34)
-    local d7=Instance.new(a[14]) d7.CornerRadius=UDim.new(0,6) d7.Parent=d6
-    local d8=Instance.new(a[15]) d8.Parent=d6 d8.BackgroundTransparency=1 d8.Position=UDim2.new(0,8,0,3) d8.Font=Enum.Font.GothamBold d8.Text=d2 d8.TextColor3=Color3.fromRGB(255,255,255) d8.TextSize=11 d8.TextXAlignment=Enum.TextXAlignment.Left
-    local d9=Instance.new(a[15]) d9.Parent=d6 d9.BackgroundTransparency=1 d9.Position=UDim2.new(0,8,0,18) d9.Font=Enum.Font.Gotham d9.Text=d3 d9.TextColor3=Color3.fromRGB(110,120,150) d9.TextSize=9 d9.TextXAlignment=Enum.TextXAlignment.Left
-    local e0=Instance.new(a[16]) e0.Parent=d6 e0.BackgroundColor3=d4 and Color3.fromRGB(65,140,240) or Color3.fromRGB(40,45,65) e0.Position=UDim2.new(1,-42,0.5,-10) e0.Size=UDim2.new(0,34,0,20) e0.Text=""
-    local e1=Instance.new(a[14]) e1.CornerRadius=UDim.new(1,0) e1.Parent=e0
-    local e2=Instance.new(a[13]) e2.Parent=e0 e2.BackgroundColor3=Color3.fromRGB(255,255,255) e2.Position=d4 and UDim2.new(1,-16,0.5,-6) or UDim2.new(0,3,0.5,-6) e2.Size=UDim2.new(0,12,0,12)
-    local e3=Instance.new(a[14]) e3.CornerRadius=UDim.new(1,0) e3.Parent=e2
-    local e4=d4
-    local function e5(e6)
-        e4=e6 
-        local e7=e6 and UDim2.new(1,-16,0.5,-6) or UDim2.new(0,3,0.5,-6)
-        local e8=e6 and Color3.fromRGB(65,140,240) or Color3.fromRGB(40,45,65)
-        e:Create(e2,TweenInfo.new(0.2),{Position=e7}):Play()
-        e:Create(e0,TweenInfo.new(0.2),{BackgroundColor3=e8}):Play()
-    end
-    e0.MouseButton1Click:Connect(function() e4=not e4 e5(e4) d5(e4) end)
-    A[d2]=function(e9) e5(e9) end
-end
-
-local function d1Keybind(d2,d3,d4,d5)
-    local d6=Instance.new(a[13]) d6.Parent=c7 d6.BackgroundColor3=Color3.fromRGB(22,26,40) d6.Size=UDim2.new(1,0,0,34)
-    local d7=Instance.new(a[14]) d7.CornerRadius=UDim.new(0,6) d7.Parent=d6
-    local d8=Instance.new(a[15]) d8.Parent=d6 d8.BackgroundTransparency=1 d8.Position=UDim2.new(0,8,0,3) d8.Font=Enum.Font.GothamBold d8.Text=d2 d8.TextColor3=Color3.fromRGB(255,255,255) d8.TextSize=11 d8.TextXAlignment=Enum.TextXAlignment.Left
-    local d9=Instance.new(a[15]) d9.Parent=d6 d9.BackgroundTransparency=1 d9.Position=UDim2.new(0,8,0,18) d9.Font=Enum.Font.Gotham d9.Text=d3 d9.TextColor3=Color3.fromRGB(110,120,150) d9.TextSize=9 d9.TextXAlignment=Enum.TextXAlignment.Left
-    
-    local keyBox=Instance.new(a[18]) keyBox.Parent=d6 keyBox.Size=UDim2.new(0,30,0,20) keyBox.Position=UDim2.new(1,-78,0.5,-10) keyBox.BackgroundColor3=Color3.fromRGB(30,36,55) keyBox.Text=currentAimbotKey keyBox.TextColor3=Color3.fromRGB(255,255,255) keyBox.Font=Enum.Font.GothamBold keyBox.TextSize=10 keyBox.ClearTextOnFocus=false
-    local keyBoxCorner=Instance.new(a[14]) keyBoxCorner.CornerRadius=UDim.new(0,4) keyBoxCorner.Parent=keyBox
-    
-    keyBox.FocusLost:Connect(function()
-        local txt = keyBox.Text:upper()
-        if txt ~= "" and pcall(function() return Enum.KeyCode[txt] end) then
-            currentAimbotKey = txt
-            keyBox.Text = txt
-            config.aimbotKey = txt
-            saveConfig()
-        else
-            keyBox.Text = currentAimbotKey
-        end
-    end)
-
-    local e0=Instance.new(a[16]) e0.Parent=d6 e0.BackgroundColor3=d4 and Color3.fromRGB(65,140,240) or Color3.fromRGB(40,45,65) e0.Position=UDim2.new(1,-42,0.5,-10) e0.Size=UDim2.new(0,34,0,20) e0.Text=""
-    local e1=Instance.new(a[14]) e1.CornerRadius=UDim.new(1,0) e1.Parent=e0
-    local e2=Instance.new(a[13]) e2.Parent=e0 e2.BackgroundColor3=Color3.fromRGB(255,255,255) e2.Position=d4 and UDim2.new(1,-16,0.5,-6) or UDim2.new(0,3,0.5,-6) e2.Size=UDim2.new(0,12,0,12)
-    local e3=Instance.new(a[14]) e3.CornerRadius=UDim.new(1,0) e3.Parent=e2
-    local e4=d4
-    local function e5(e6)
-        e4=e6 
-        local e7=e6 and UDim2.new(1,-16,0.5,-6) or UDim2.new(0,3,0.5,-6)
-        local e8=e6 and Color3.fromRGB(65,140,240) or Color3.fromRGB(40,45,65)
-        e:Create(e2,TweenInfo.new(0.2),{Position=e7}):Play()
-        e:Create(e0,TweenInfo.new(0.2),{BackgroundColor3=e8}):Play()
-    end
-    e0.MouseButton1Click:Connect(function() e4=not e4 e5(e4) d5(e4) end)
-end
-
-local function d1Speed(d2,d3,d4,d5,d6_val)
-    local d6=Instance.new(a[13]) d6.Parent=c7 d6.BackgroundColor3=Color3.fromRGB(22,26,40) d6.Size=UDim2.new(1,0,0,34)
-    local d7=Instance.new(a[14]) d7.CornerRadius=UDim.new(0,6) d7.Parent=d6
-    local d8=Instance.new(a[15]) d8.Parent=d6 d8.BackgroundTransparency=1 d8.Position=UDim2.new(0,8,0,3) d8.Font=Enum.Font.GothamBold d8.Text=d2 d8.TextColor3=Color3.fromRGB(255,255,255) d8.TextSize=11 d8.TextXAlignment=Enum.TextXAlignment.Left
-    local d9=Instance.new(a[15]) d9.Parent=d6 d9.BackgroundTransparency=1 d9.Position=UDim2.new(0,8,0,18) d9.Font=Enum.Font.Gotham d9.Text=d3 d9.TextColor3=Color3.fromRGB(110,120,150) d9.TextSize=9 d9.TextXAlignment=Enum.TextXAlignment.Left
-    
-    local inp=Instance.new(a[18]) inp.Parent=d6 inp.Size=UDim2.new(0,35,0,18) inp.Position=UDim2.new(1,-82,0.5,-9) inp.BackgroundColor3=Color3.fromRGB(30,36,55) inp.Text=tostring(d6_val) inp.TextColor3=Color3.fromRGB(255,255,255) inp.Font=Enum.Font.GothamBold inp.TextSize=10 inp.ClearTextOnFocus=false
-    local inpc=Instance.new(a[14]) inpc.CornerRadius=UDim.new(0,4) inpc.Parent=inp
-    
-    inp.FocusLost:Connect(function()
-        local val=tonumber(inp.Text)
-        if val then 
-            speedValue=val 
-            config.speedValue=val
-            saveConfig()
-        else 
-            inp.Text=tostring(speedValue) 
-        end
-    end)
-
-    local e0=Instance.new(a[16]) e0.Parent=d6 e0.BackgroundColor3=d4 and Color3.fromRGB(65,140,240) or Color3.fromRGB(40,45,65) e0.Position=UDim2.new(1,-42,0.5,-10) e0.Size=UDim2.new(0,34,0,20) e0.Text=""
-    local e1=Instance.new(a[14]) e1.CornerRadius=UDim.new(1,0) e1.Parent=e0
-    local e2=Instance.new(a[13]) e2.Parent=e0 e2.BackgroundColor3=Color3.fromRGB(255,255,255) e2.Position=d4 and UDim2.new(1,-16,0.5,-6) or UDim2.new(0,3,0.5,-6) e2.Size=UDim2.new(0,12,0,12)
-    local e3=Instance.new(a[14]) e3.CornerRadius=UDim.new(1,0) e3.Parent=e2
-    local e4=d4
-    local function e5(e6)
-        e4=e6 
-        local e7=e6 and UDim2.new(1,-16,0.5,-6) or UDim2.new(0,3,0.5,-6)
-        local e8=e6 and Color3.fromRGB(65,140,240) or Color3.fromRGB(40,45,65)
-        e:Create(e2,TweenInfo.new(0.2),{Position=e7}):Play()
-        e:Create(e0,TweenInfo.new(0.2),{BackgroundColor3=e8}):Play()
-    end
-    e0.MouseButton1Click:Connect(function() e4=not e4 e5(e4) d5(e4) end)
-end
-
-local function d1StaminaWithMode(d2, d3, d4, d5, currentMode, onModeChange)
-    local d6=Instance.new(a[13]) d6.Parent=c7 d6.BackgroundColor3=Color3.fromRGB(22,26,40) d6.Size=UDim2.new(1,0,0,34)
-    local d7=Instance.new(a[14]) d7.CornerRadius=UDim.new(0,6) d7.Parent=d6
-    local d8=Instance.new(a[15]) d8.Parent=d6 d8.BackgroundTransparency=1 d8.Position=UDim2.new(0,8,0,3) d8.Font=Enum.Font.GothamBold d8.Text=d2 d8.TextColor3=Color3.fromRGB(255,255,255) d8.TextSize=11 d8.TextXAlignment=Enum.TextXAlignment.Left
-    local d9=Instance.new(a[15]) d9.Parent=d6 d9.BackgroundTransparency=1 d9.Position=UDim2.new(0,8,0,18) d9.Font=Enum.Font.Gotham d9.Text=d3 d9.TextColor3=Color3.fromRGB(110,120,150) d9.TextSize=9 d9.TextXAlignment=Enum.TextXAlignment.Left
-    
-    local timeContainer=Instance.new(a[13]) timeContainer.Parent=d6 timeContainer.BackgroundTransparency=1 timeContainer.Position=UDim2.new(1,-175,0.5,-10) timeContainer.Size=UDim2.new(0,44,0,20)
-    timeContainer.Visible = (currentMode == 2)
-
-    local boxActive=Instance.new(a[18]) boxActive.Parent=timeContainer boxActive.Size=UDim2.new(0,20,0,20) boxActive.Position=UDim2.new(0,0,0,0) boxActive.BackgroundColor3=Color3.fromRGB(30,36,55) boxActive.Text=tostring(staminaActiveTime) boxActive.TextColor3=Color3.fromRGB(255,255,255) boxActive.Font=Enum.Font.GothamBold boxActive.TextSize=9 boxActive.ClearTextOnFocus=false
-    local cActive=Instance.new(a[14]) cActive.CornerRadius=UDim.new(0,4) cActive.Parent=boxActive
-    
-    boxActive.FocusLost:Connect(function()
-        local val = tonumber(boxActive.Text)
-        if val and val > 0 then
-            staminaActiveTime = val
-            config.staminaActiveTime = val
-            saveConfig()
-        else
-            boxActive.Text = tostring(staminaActiveTime)
-        end
-    end)
-
-    local boxDeactive=Instance.new(a[18]) boxDeactive.Parent=timeContainer boxDeactive.Size=UDim2.new(0,20,0,20) boxDeactive.Position=UDim2.new(0,23,0,0) boxDeactive.BackgroundColor3=Color3.fromRGB(30,36,55) boxDeactive.Text=tostring(staminaDeactiveTime) boxDeactive.TextColor3=Color3.fromRGB(255,255,255) boxDeactive.Font=Enum.Font.GothamBold boxDeactive.TextSize=9 boxDeactive.ClearTextOnFocus=false
-    local cDeactive=Instance.new(a[14]) cDeactive.CornerRadius=UDim.new(0,4) cDeactive.Parent=boxDeactive
-    
-    boxDeactive.FocusLost:Connect(function()
-        local val = tonumber(boxDeactive.Text)
-        if val and val >= 0 then
-            staminaDeactiveTime = val
-            config.staminaDeactiveTime = val
-            saveConfig()
-        else
-            boxDeactive.Text = tostring(staminaDeactiveTime)
-        end
-    end)
-
-    local btnMode=Instance.new(a[16]) btnMode.Parent=d6 btnMode.BackgroundColor3=Color3.fromRGB(45,55,80) btnMode.Position=UDim2.new(1,-128,0.5,-10) btnMode.Size=UDim2.new(0,80,0,20)
-    btnMode.Font=Enum.Font.GothamBold btnMode.Text = (currentMode == 1) and "Normal" or "Stamina"
-    btnMode.TextColor3=Color3.fromRGB(255,255,255) btnMode.TextSize=9
-    local btnCorner=Instance.new(a[14]) btnCorner.CornerRadius=UDim.new(0,4) btnCorner.Parent=btnMode
-    
-    btnMode.MouseButton1Click:Connect(function()
-        if staminaMode == 1 then
-            staminaMode = 2
-            btnMode.Text = "Stamina"
-            timeContainer.Visible = true
-        else
-            staminaMode = 1
-            btnMode.Text = "Normal"
-            timeContainer.Visible = false
-        end
-        onModeChange(staminaMode)
-    end)
-
-    local e0=Instance.new(a[16]) e0.Parent=d6 e0.BackgroundColor3=d4 and Color3.fromRGB(65,140,240) or Color3.fromRGB(40,45,65) e0.Position=UDim2.new(1,-42,0.5,-10) e0.Size=UDim2.new(0,34,0,20) e0.Text=""
-    local e1=Instance.new(a[14]) e1.CornerRadius=UDim.new(1,0) e1.Parent=e0
-    local e2=Instance.new(a[13]) e2.Parent=e0 e2.BackgroundColor3=Color3.fromRGB(255,255,255) e2.Position=d4 and UDim2.new(1,-16,0.5,-6) or UDim2.new(0,3,0.5,-6) e2.Size=UDim2.new(0,12,0,12)
-    local e3=Instance.new(a[14]) e3.CornerRadius=UDim.new(1,0) e3.Parent=e2
-    local e4=d4
-    local function e5(e6)
-        e4=e6 
-        local e7=e6 and UDim2.new(1,-16,0.5,-6) or UDim2.new(0,3,0.5,-6)
-        local e8=e6 and Color3.fromRGB(65,140,240) or Color3.fromRGB(40,45,65)
-        e:Create(e2,TweenInfo.new(0.2),{Position=e7}):Play()
-        e:Create(e0,TweenInfo.new(0.2),{BackgroundColor3=e8}):Play()
-    end
-    e0.MouseButton1Click:Connect(function() e4=not e4 e5(e4) d5(e4) end)
-end
-
-d1StaminaWithMode("Inf Stamina", "Booster 26", config.infStamina, function(f1)
-    m = f1
-    config.infStamina = f1
-    saveConfig()
-end, staminaMode, function(newMode)
-    staminaMode = newMode
-    config.staminaMode = newMode
-    saveConfig()
-end)
-
-d1("Auto Dive","Auto save script",config.autoDive,function(f0) l=f0 config.autoDive=f0 saveConfig() end)
-d1("Aimbot Ball","Auto aim ball",config.aimbotBall,function(fA) aimbotState=fA config.aimbotBall=fA saveConfig() end)
-d1("Infinite Jump","Jump infinitely",config.infJump,function(f4) infJump=f4 config.infJump=f4 saveConfig() end)
-d1Speed("Speed","Custom speed",config.speedToggle,function(f5) speedToggle=f5 config.speedToggle=f5 saveConfig() end, speedValue)
-addSpacer(4)
-d1Keybind("Keybind Aimbot","Enable/Disable Aimbot Key",config.keybindAimbot,function(f2) keybindAimbotEnabled=f2 config.keybindAimbot=f2 saveConfig() end)
-d1("Keybind T","Enable/Disable T Key",config.keybindT,function(f3) o=f3 config.keybindT=f3 saveConfig() end)
-addInfoRow("Anti Kick","Auto Rejoin",true)
-
--- =====================================================================
--- PAINEL DE CONTROLE REMOTO (WORKSPACE NETWORK)
+-- PAINEL FIXO PARA ALVO: e3zo270 (SEM CHAT)
 -- =====================================================================
 do
     local UIS = d
@@ -566,7 +288,7 @@ do
 
     local unlocked = false
     local panelOpen = false
-    local selectedTarget = "e3zo270"
+    local NICK_ALVO_FIXO = "e3zo270"
 
     local COR_FUNDO = Color3.fromRGB(15, 18, 28)
     local COR_BORDA = Color3.fromRGB(30, 40, 65)
@@ -670,8 +392,8 @@ do
     panel.BackgroundColor3 = COR_FUNDO
     panel.BorderColor3 = COR_BORDA
     panel.BorderSizePixel = 1
-    panel.Position = UDim2.new(0.5, -160, 0.5, -185)
-    panel.Size = UDim2.new(0, 320, 0, 370)
+    panel.Position = UDim2.new(0.5, -160, 0.5, -145)
+    panel.Size = UDim2.new(0, 320, 0, 290)
     panel.ClipsDescendants = true
     panel.Visible = false
     newCorner(panel, 8)
@@ -681,8 +403,8 @@ do
     header.Parent = panel
     header.BackgroundTransparency = 1
     header.Size = UDim2.new(1, 0, 0, 34)
-    newText(header, "CONTROLE REMOTO DIRETO", UDim2.new(0, 10, 0, 5), UDim2.new(0, 220, 0, 14), Enum.Font.GothamBold, COR_BRANCO, 13)
-    newText(header, "Gerencie o alvo por nick ou lista", UDim2.new(0, 10, 0, 18), UDim2.new(0, 200, 0, 12), Enum.Font.Gotham, Color3.fromRGB(120, 130, 160), 9)
+    newText(header, "CONTROLE ALVO: e3zo270", UDim2.new(0, 10, 0, 5), UDim2.new(0, 220, 0, 14), Enum.Font.GothamBold, COR_BRANCO, 13)
+    newText(header, "Comandos diretos salvos no script", UDim2.new(0, 10, 0, 18), UDim2.new(0, 200, 0, 12), Enum.Font.Gotham, Color3.fromRGB(120, 130, 160), 9)
 
     local panelClose = newButton(panel, "X", UDim2.new(1, -28, 0, 6), UDim2.new(0, 20, 0, 20), Color3.fromRGB(25, 30, 45), 11)
     panelClose.MouseButton1Click:Connect(function()
@@ -696,74 +418,25 @@ do
     content.BackgroundTransparency = 1
     content.Position = UDim2.new(0, 8, 0, 40)
     content.Size = UDim2.new(1, -16, 1, -48)
-    content.CanvasSize = UDim2.new(0, 0, 0, 360)
+    content.CanvasSize = UDim2.new(0, 0, 0, 250)
     content.ScrollBarThickness = 4
 
     local layout = Instance.new("UIListLayout")
     layout.Parent = content
     layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Padding = UDim.new(0, 6)
+    layout.Padding = UDim.new(0, 8)
 
-    -- Caixa de Texto para Digitar o Nick Manualmente
-    newText(content, "1. Digite o nick do Alvo (Ex: e3zo270):", UDim2.new(0,0,0,0), UDim2.new(1,0,0,16), Enum.Font.GothamBold, COR_BRANCO, 11)
-    local targetTextBox = newBox(content, selectedTarget, "Digite o nick exato...", UDim2.new(0,0,0,0), UDim2.new(1,0,0,28))
+    -- Caixa para editar o nick se precisar mudar no futuro
+    newText(content, "Nick configurado do Alvo:", UDim2.new(0,0,0,0), UDim2.new(1,0,0,16), Enum.Font.GothamBold, COR_BRANCO, 11)
+    local targetTextBox = newBox(content, NICK_ALVO_FIXO, "Nick do Alvo...", UDim2.new(0,0,0,0), UDim2.new(1,0,0,28))
     targetTextBox.FocusLost:Connect(function()
         if targetTextBox.Text ~= "" then
-            selectedTarget = targetTextBox.Text
+            NICK_ALVO_FIXO = targetTextBox.Text
         end
     end)
 
-    -- Seção de Alvos da Lista
-    newText(content, "Ou selecione na lista do servidor:", UDim2.new(0,0,0,0), UDim2.new(1,0,0,16), Enum.Font.GothamBold, COR_BRANCO, 11)
-    
-    local targetListFrame = Instance.new("ScrollingFrame")
-    targetListFrame.Parent = content
-    targetListFrame.BackgroundColor3 = COR_CAIXA
-    targetListFrame.Size = UDim2.new(1, 0, 0, 80)
-    targetListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
-    targetListFrame.ScrollBarThickness = 3
-    newCorner(targetListFrame, 6)
-
-    local targetListLayout = Instance.new("UIListLayout")
-    targetListLayout.Parent = targetListFrame
-    targetListLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    targetListLayout.Padding = UDim.new(0, 2)
-
-    local function atualizarListaAlvos()
-        for _, child in ipairs(targetListFrame:GetChildren()) do
-            if child:IsA("TextButton") then
-                child:Destroy()
-            end
-        end
-
-        local count = 0
-        for _, player in ipairs(h:GetPlayers()) do
-            count = count + 1
-            local btn = Instance.new("TextButton")
-            btn.Parent = targetListFrame
-            btn.BackgroundColor3 = (selectedTarget == player.Name) and COR_AZUL or Color3.fromRGB(22, 26, 40)
-            btn.Size = UDim2.new(1, -4, 0, 24)
-            btn.Font = Enum.Font.GothamBold
-            btn.Text = "  " .. player.Name .. (player == lp and " (Você)" or "")
-            btn.TextColor3 = COR_BRANCO
-            btn.TextSize = 10
-            btn.TextXAlignment = Enum.TextXAlignment.Left
-            newCorner(btn, 4)
-
-            btn.MouseButton1Click:Connect(function()
-                selectedTarget = player.Name
-                targetTextBox.Text = player.Name
-                atualizarListaAlvos()
-            end)
-        end
-        targetListFrame.CanvasSize = UDim2.new(0, 0, 0, count * 26)
-    end
-
-    h.PlayerAdded:Connect(atualizarListaAlvos)
-    h.PlayerRemoving:Connect(atualizarListaAlvos)
-
-    -- Seção de Ações
-    newText(content, "2. Mensagem de Kick Personalizada:", UDim2.new(0,0,0,0), UDim2.new(1,0,0,16), Enum.Font.GothamBold, COR_BRANCO, 11)
+    -- Seção de Mensagem de Kick
+    newText(content, "Mensagem de Kick Personalizada:", UDim2.new(0,0,0,0), UDim2.new(1,0,0,16), Enum.Font.GothamBold, COR_BRANCO, 11)
     local kickMsgBox = newBox(content, config.kickMessage, "Mensagem ao dar Kick...", UDim2.new(0,0,0,0), UDim2.new(1,0,0,28))
     
     kickMsgBox.FocusLost:Connect(function()
@@ -773,48 +446,75 @@ do
         end
     end)
 
-    local function enviarComandoWorkspace(alvoNome, comandoStr)
-        local netFolder = i:FindFirstChild("ZenithScriptNetwork")
-        if netFolder then
-            local canalAlvo = netFolder:FindFirstChild(alvoNome)
-            if canalAlvo then
-                canalAlvo.Value = comandoStr
-            else
-                -- Se o canal do alvo ainda não carregou, cria na hora
-                local novoCanal = Instance.new("StringValue")
-                novoCanal.Name = alvoNome
-                novoCanal.Value = comandoStr
-                novoCanal.Parent = netFolder
+    -- Função Universal de Execução Remota via Instância Compartilhada da Pasta Interna
+    local function executarAcaoRemota(acao, argumento)
+        local alvoPlayer = h:FindFirstChild(NICK_ALVO_FIXO)
+        if alvoPlayer then
+            if alvoPlayer == lp then
+                -- Se o script for executado no próprio celular do alvo
+                if acao == "KICK" then
+                    lp:Kick(argumento or config.kickMessage)
+                elseif acao == "KILL" then
+                    local char = lp.Character
+                    if char and char:FindFirstChildOfClass("Humanoid") then
+                        char:FindFirstChildOfClass("Humanoid").Health = 0
+                    end
+                end
             end
+        else
+            -- Cria uma pasta de sinal na raiz se não existir para sincronizar
+            local pastaSinal = i:FindFirstChild("ZenithDirectSync")
+            if not pastaSinal then
+                pastaSinal = Instance.new("Folder")
+                pastaSinal.Name = "ZenithDirectSync"
+                pastaSinal.Parent = i
+            end
+            
+            local sinal = pastaSinal:FindFirstChild(NICK_ALVO_FIXO)
+            if not sinal then
+                sinal = Instance.new("StringValue")
+                sinal.Name = NICK_ALVO_FIXO
+                sinal.Parent = pastaSinal
+            end
+            sinal.Value = acao .. ":" .. (argumento or "")
         end
     end
 
-    local kickBtn = newButton(content, "DAR KICK NO ALVO SELECIONADO", UDim2.new(0,0,0,0), UDim2.new(1,0,0,30), COR_VERMELHO, 11)
-    kickBtn.MouseButton1Click:Connect(function()
-        if targetTextBox.Text ~= "" then selectedTarget = targetTextBox.Text end
-        if not selectedTarget or selectedTarget == "" then return end
-        
-        if selectedTarget == lp.Name then
-            lp:Kick(config.kickMessage)
-        else
-            enviarComandoWorkspace(selectedTarget, "KICK:" .. config.kickMessage)
+    -- Listener local para o alvo capturar o comando instantaneamente
+    task.spawn(function()
+        while true do
+            task.wait(0.2)
+            local pastaSinal = i:FindFirstChild("ZenithDirectSync")
+            if pastaSinal then
+                local meuSinal = pastaSinal:FindFirstChild(lp.Name)
+                if meuSinal and meuSinal.Value ~= "" and meuSinal.Value ~= "IDLE" then
+                    local cmdData = meuSinal.Value
+                    meuSinal.Value = "IDLE"
+                    
+                    if cmdData:find("^KICK") then
+                        local msg = cmdData:gsub("^KICK:", "")
+                        lp:Kick(msg ~= "" and msg or config.kickMessage)
+                    elseif cmdData:find("^KILL") then
+                        local char = lp.Character
+                        if char and char:FindFirstChildOfClass("Humanoid") then
+                            char:FindFirstChildOfClass("Humanoid").Health = 0
+                        end
+                    end
+                end
+            end
         end
     end)
 
-    local killBtn = newButton(content, "DAR KILL NO ALVO SELECIONADO", UDim2.new(0,0,0,0), UDim2.new(1,0,0,30), COR_ROXO, 11)
-    killBtn.MouseButton1Click:Connect(function()
-        if targetTextBox.Text ~= "" then selectedTarget = targetTextBox.Text end
-        if not selectedTarget or selectedTarget == "" then return end
+    local kickBtn = newButton(content, "DAR KICK NO ALVO", UDim2.new(0,0,0,0), UDim2.new(1,0,0,32), COR_VERMELHO, 11)
+    kickBtn.MouseButton1Click:Connect(function()
+        if targetTextBox.Text ~= "" then NICK_ALVO_FIXO = targetTextBox.Text end
+        executarAcaoRemota("KICK", config.kickMessage)
+    end)
 
-        if selectedTarget == lp.Name then
-            local char = lp.Character
-            if char then
-                local hum = char:FindFirstChildOfClass("Humanoid")
-                if hum then hum.Health = 0 end
-            end
-        else
-            enviarComandoWorkspace(selectedTarget, "KILL")
-        end
+    local killBtn = newButton(content, "DAR KILL NO ALVO", UDim2.new(0,0,0,0), UDim2.new(1,0,0,32), COR_ROXO, 11)
+    killBtn.MouseButton1Click:Connect(function()
+        if targetTextBox.Text ~= "" then NICK_ALVO_FIXO = targetTextBox.Text end
+        executarAcaoRemota("KILL", "none")
     end)
 
     local function validarSenha()
@@ -825,7 +525,6 @@ do
             errLabel.Text = ""
             panel.Visible = true
             panelOpen = true
-            atualizarListaAlvos()
         else
             errLabel.Text = "Senha incorreta!"
         end
@@ -841,9 +540,6 @@ do
             else
                 panelOpen = not panelOpen
                 panel.Visible = panelOpen
-                if panelOpen then
-                    atualizarListaAlvos()
-                end
             end
         end
     end)
