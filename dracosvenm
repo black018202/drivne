@@ -1,619 +1,770 @@
--- VERIFICAÇÃO DE PERMISSÃO (SISTEMA VIP)
-local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
+local a={"UserInputService","TweenService","CoreGui","RunService","Players","Workspace","VirtualInputManager","TPS","Ball","Football","HumanoidRootPart","ScreenGui","Frame","UICorner","TextLabel","TextButton","UIListLayout","TextBox","TeleportService","GuiService"}
+local function b(c)return game:GetService(a[c])end
+local d,e,f,g,h,i,j,tp,gui=b(1),b(2),b(3),b(4),b(5),b(6),b(7),b(19),b(20)
+local k=h.LocalPlayer
 
-local UsuariosPermitidos = {
-    ["Black_123287"] = true,
-    ["FLASNHN44"] = true,
-    ["isshuohuy7"] = true,
-    ["Usuario4"] = true,
-    ["Usuario5"] = true,
-    ["Usuario6"] = true,
-    ["Usuario7"] = true,
-    ["Usuario8"] = true,
-    ["Usuario9"] = true,
-    ["Usuario10"] = true,
+if f:FindFirstChild("ZenithMobileUI") then f.ZenithMobileUI:Destroy() end
+
+local fileName = "ZenithGoalkeeperConfig.json"
+local HttpService = game:GetService("HttpService")
+
+local config = {
+    autoDive = false,
+    infStamina = false,
+    staminaMode = 1, -- 1 = Normal, 2 = Stamina
+    staminaActiveTime = 5,
+    staminaDeactiveTime = 3,
+    aimbotBall = false,
+    infJump = false,
+    speedToggle = false,
+    speedValue = 26,
+    keybindT = true,
+    keybindAimbot = true,
+    aimbotKey = "R",
+    kickMessage = "Você saiu do jogo.",
+    cmdPassword = "anexushl" -- Senha salva automaticamente
 }
 
-if not (UsuariosPermitidos[LocalPlayer.Name] or UsuariosPermitidos[LocalPlayer.DisplayName]) then
-    pcall(function()
-        game:GetService("StarterGui"):SetCore("SendNotification", {
-            Title = "Acesso Negado",
-            Text = "Você não tem permissão para usar este script.",
-            Duration = 5
-        })
-    end)
-    warn("Acesso negado para: " .. LocalPlayer.Name)
-    return
-end
-
--- FIX PARA DUPLICIDADE: Limpa a interface e desativa os loops em segundo plano do script antigo
-if getgenv().DesativarScriptAntigo then
-    getgenv().DesativarScriptAntigo()
-end
-
-if game:GetService("CoreGui"):FindFirstChild("Rayfield") then
-    game:GetService("CoreGui").Rayfield:Destroy()
-end
-
-getgenv().DesativarScriptAntigo = function()
-    if getgenv().ConexaoVelocidade then
-        getgenv().ConexaoVelocidade:Disconnect()
-        getgenv().ConexaoVelocidade = nil
-    end
-    getgenv().AutoAttackRodando = false
-end
-
-getgenv().AutoAttackRodando = true
-
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
-local TweenService = game:GetService("TweenService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
-local RunService = game:GetService("RunService")
-local Camera = workspace.CurrentCamera
-
-local Window = Rayfield:CreateWindow({
-   Name = "Menu",
-   LoadingTitle = "LOADING",
-   LoadingSubtitle = "Dracosw👑",
-   ConfigurationSaving = {
-       Enabled = true,
-       FolderName = "RayfieldConfig",
-       FileName = "MinhaConfig"
-   },
-   Discord = { Enabled = false },
-   KeySystem = false
-})
-
------------------------------------------------------------
--- ABAS (1: COMBAT, 2: MOVIMENTAÇÃO, 3: ESP, 4: CONFIG)
------------------------------------------------------------
-local TabCombat = Window:CreateTab("Combat", 0)
-local TabMove = Window:CreateTab("Movimentação", 0)
-local TabESP = Window:CreateTab("ESP", 0)
-local TabConfig = Window:CreateTab("Config ⚙️", 0)
-
------------------------------------------------------------
--- PARTE 1: AUTO ATTACK (ALVO FIXO + OFFSET SÓ SE ANDAR)
------------------------------------------------------------
-local autoAttackActive = false
-local currentTween = nil
-local TWEEN_SPEED = 38
-local lockedTarget = nil
-local OFFSET_STUDS = 2 
-
-local function getClosestPlayer()
-    local closestPlayer = nil
-    local shortestDistance = math.huge
-    local myChar = LocalPlayer.Character
-    if not myChar or not myChar:FindFirstChild("HumanoidRootPart") then return nil end
-    local myPos = myChar.HumanoidRootPart.Position
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
-            local dist = (player.Character.HumanoidRootPart.Position - myPos).Magnitude
-            if dist < shortestDistance then 
-                shortestDistance = dist 
-                closestPlayer = player 
-            end
-        end
-    end
-    return closestPlayer
-end
-
-local function equipBat()
-    local character = LocalPlayer.Character
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    if not character or not backpack then return end
-    for _, item in pairs(character:GetChildren()) do
-        if item:IsA("Tool") and (item.Name:lower():find("bast") or item.Name:lower():find("bat")) then return item end
-    end
-    for _, item in pairs(backpack:GetChildren()) do
-        if item:IsA("Tool") and (item.Name:lower():find("bast") or item.Name:lower():find("bat")) then
-            item.Parent = character
-            return item
-        end
+local function saveConfig()
+    if writefile then
+        pcall(function()
+            writefile(fileName, HttpService:JSONEncode(config))
+        end)
     end
 end
 
-local function startAutoAttack()
-    lockedTarget = getClosestPlayer()
-    
-    task.spawn(function()
-        while autoAttackActive and lockedTarget and getgenv().AutoAttackRodando do
-            if lockedTarget.Character and lockedTarget.Character:FindFirstChild("HumanoidRootPart") and lockedTarget.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
-                local myChar = LocalPlayer.Character
-                if myChar and myChar:FindFirstChild("HumanoidRootPart") then
-                    equipBat()
-                    
-                    local targetHRP = lockedTarget.Character.HumanoidRootPart
-                    local targetHumanoid = lockedTarget.Character:FindFirstChildOfClass("Humanoid")
-                    local targetCFrame = targetHRP.CFrame
-                    
-                    if targetHumanoid and targetHumanoid.MoveDirection.Magnitude > 0 then
-                        targetCFrame = targetHRP.CFrame * CFrame.new(0, 0, -OFFSET_STUDS)
-                    end
-                    
-                    local distance = (targetCFrame.Position - myChar.HumanoidRootPart.Position).Magnitude
-                    local tweenTime = distance / TWEEN_SPEED
-                    local tweenInfo = TweenInfo.new(tweenTime, Enum.EasingStyle.Linear)
-                    
-                    currentTween = TweenService:Create(myChar.HumanoidRootPart, tweenInfo, {CFrame = targetCFrame})
-                    currentTween:Play()
-                    
-                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-                    task.wait(0.05)
-                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
+local function loadConfig()
+    if readfile and isfile and isfile(fileName) then
+        pcall(function()
+            local data = HttpService:JSONDecode(readfile(fileName))
+            if type(data) == "table" then
+                for k, v in pairs(data) do
+                    if config[k] ~= nil then config[k] = v end
                 end
-            else
-                break
             end
-            task.wait(0.1)
-        end
-        
-        if currentTween then currentTween:Cancel() end
-    end)
+        end)
+    end
 end
 
-TabCombat:CreateToggle({
-   Name = "Auto Attack Player (Tecla R)",
-   CurrentValue = false,
-   Flag = "AutoAttackFlag",
-   Callback = function(Value)
-      autoAttackActive = Value
-      if autoAttackActive then 
-          startAutoAttack() 
-      else
-          lockedTarget = nil
-          if currentTween then currentTween:Cancel() end
-      end
-   end,
-})
+loadConfig()
 
-TabCombat:CreateKeybind({
-   Name = "Ativar/Desativar no R",
-   CurrentKeybind = "R",
-   Flag = "AttackKeybind",
-   Callback = function()
-      local Toggle = Rayfield.Flags["AutoAttackFlag"]
-      Toggle:Set(not Toggle.CurrentValue)
-   end,
-})
+local l,m,aimbotState,o,p,infJump,speedToggle = config.autoDive, config.infStamina, config.aimbotBall, config.keybindT, false, config.infJump, config.speedToggle
+local staminaMode = config.staminaMode or 1
+local staminaActiveTime = config.staminaActiveTime or 5
+local staminaDeactiveTime = config.staminaDeactiveTime or 3
+local keybindAimbotEnabled = config.keybindAimbot
+local currentAimbotKey = config.aimbotKey or "R"
 
-TabCombat:CreateSlider({
-   Name = "Velocidade do Tween (Auto Attack)",
-   Range = {10, 100},
-   Increment = 1,
-   Suffix = " Speed",
-   CurrentValue = 38,
-   Flag = "TweenSpeedFlag",
-   Callback = function(Value)
-      TWEEN_SPEED = Value
-   end,
-})
+local q,r,s,t,u=22,0,0.6,-19,4
+local v,w,x=0,0,nil
+local y,z=26,16
+local speedValue=config.speedValue
+local A={}
+local tentandoReconectar=false
 
-TabCombat:CreateSlider({
-   Name = "Distância à Frente em Movimento (Studs)",
-   Range = {1, 10},
-   Increment = 1,
-   Suffix = " Studs",
-   CurrentValue = 2,
-   Flag = "OffsetStudsFlag",
-   Callback = function(Value)
-      OFFSET_STUDS = Value
-   end,
-})
+local effectiveStaminaActive = false
 
------------------------------------------------------------
--- PARTE 2: VELOCIDADE SEM DESLIZAR
------------------------------------------------------------
-local speedValue = 16
-local isSpeedEnabled = false
-
-getgenv().ConexaoVelocidade = RunService.RenderStepped:Connect(function()
-    if isSpeedEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-        local root = LocalPlayer.Character.HumanoidRootPart
-        local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        
-        if humanoid then
-            local moveDir = humanoid.MoveDirection
-            if moveDir.Magnitude > 0 then
-                root.AssemblyLinearVelocity = Vector3.new(moveDir.X * speedValue, root.AssemblyLinearVelocity.Y, moveDir.Z * speedValue)
+-- Loop dedicado de Stamina
+task.spawn(function()
+    while true do
+        if m then
+            if staminaMode == 2 then
+                effectiveStaminaActive = true
+                task.wait(staminaActiveTime)
+                
+                if not m or staminaMode ~= 2 then 
+                    effectiveStaminaActive = false
+                    task.wait(0.2)
+                    continue 
+                end
+                
+                effectiveStaminaActive = false
+                task.wait(staminaDeactiveTime)
             else
-                root.AssemblyLinearVelocity = Vector3.new(0, root.AssemblyLinearVelocity.Y, 0)
+                effectiveStaminaActive = true
+                task.wait(0.2)
+            end
+        else
+            effectiveStaminaActive = false
+            task.wait(0.2)
+        end
+    end
+end)
+
+local bolaCache = nil
+local function obterBolaReal()
+    if bolaCache and bolaCache:IsDescendantOf(i) and bolaCache:IsA("BasePart") and not bolaCache.Anchored then
+        return bolaCache
+    end
+    
+    local possivelBola = i:FindFirstChild("TPS") or i:FindFirstChild("Ball") or i:FindFirstChild("Football")
+    if possivelBola then
+        if possivelBola:IsA("BasePart") and not possivelBola.Anchored then
+            bolaCache = possivelBola
+            return possivelBola
+        elseif possivelBola:IsA("Model") and possivelBola.PrimaryPart and not possivelBola.PrimaryPart.Anchored then
+            bolaCache = possivelBola.PrimaryPart
+            return possivelBola.PrimaryPart
+        end
+    end
+
+    for _, obj in ipairs(i:GetChildren()) do
+        local nome = obj.Name:lower()
+        if (nome == "ball" or nome == "tps" or nome == "football" or nome == "bola" or nome:find("matchball")) then
+            if obj:IsA("BasePart") and not obj.Anchored and obj.CanCollide then
+                bolaCache = obj
+                return obj
+            elseif obj:IsA("Model") then
+                local part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
+                if part and not part.Anchored then
+                    bolaCache = part
+                    return part
+                end
+            end
+        end
+    end
+    
+    bolaCache = nil
+    return nil
+end
+
+local function executarAimbotBall()
+    local char = k.Character
+    if not char then return end
+    
+    local hrp = char:FindFirstChild(a[11])
+    if not hrp then return end
+    
+    local bola = obterBolaReal()
+    if not bola then return end
+    
+    local lookAtPos = Vector3.new(bola.Position.X, hrp.Position.Y, bola.Position.Z)
+    hrp.CFrame = CFrame.new(hrp.Position, lookAtPos)
+end
+
+local function tentarReconectar()
+    if tentandoReconectar then return end
+    tentandoReconectar = true
+    task.wait(2)
+    if game.JobId and game.JobId ~= "" then
+        tp:TeleportToPlaceInstance(game.PlaceId, game.JobId, k)
+    else
+        tp:Teleport(game.PlaceId, k)
+    end
+end
+
+tp.TeleportInitFailed:Connect(function(player, teleportResult, errorMessage)
+    tentandoReconectar = false
+    task.wait(2)
+    tp:Teleport(game.PlaceId, k)
+end)
+
+gui.ErrorMessageChanged:Connect(function(errorMessage)
+    if errorMessage and #errorMessage > 0 then
+        tentandoReconectar()
+    end
+end)
+
+local function B(C)
+    j:SendKeyEvent(true,C,false,game)
+    task.defer(function() j:SendKeyEvent(false,C,false,game) end)
+end
+
+local function D()
+    if x and x:IsDescendantOf(i) then return x end
+    local E=i:FindFirstChild(a[8]) or i:FindFirstChild(a[9]) or i:FindFirstChild(a[10])
+    if E then 
+        if E:IsA("BasePart") then x=E return E 
+        elseif E:IsA("Model") and E.PrimaryPart then x=E.PrimaryPart return E.PrimaryPart end 
+    end
+    for _,F in ipairs(i:GetChildren()) do 
+        local G=F.Name:lower()
+        if G:find("ball") or G:find("tps") or G:find("bola") then 
+            if F:IsA("BasePart") and F.CanCollide then x=F return F 
+            elseif F:IsA("Model") and F.PrimaryPart then x=F.PrimaryPart return F.PrimaryPart end 
+        end 
+    end
+    x=nil return nil
+end
+
+local function H(I)
+    if I:FindFirstChildOfClass("Weld") or I:FindFirstChildOfClass("WeldConstraint") or I:FindFirstChildOfClass("Motor6D") then return true end
+    local J=I.Parent if J and J:FindFirstChildOfClass("Humanoid") then return true end
+    for _,K in ipairs(I:GetChildren()) do 
+        if(K:IsA("SelectionBox") or K:IsA("Highlight") or K:IsA("BillboardGui") or K:IsA("SurfaceGui")) and K.Visible then return true end 
+    end
+    local L=I.Position 
+    for _,M in ipairs(h:GetPlayers()) do 
+        local N=M.Character 
+        if N then 
+            local O=N:FindFirstChild(a[11])
+            if O and (L-O.Position).Magnitude<=3.5 then return true end 
+        end 
+    end
+    return false
+end
+
+d.InputBegan:Connect(function(P,Q)
+    if Q then return end
+    if P.UserInputType == Enum.UserInputType.Keyboard then
+        if keybindAimbotEnabled then
+            local success, keyCodeEnum = pcall(function() return Enum.KeyCode[currentAimbotKey] end)
+            if success and P.KeyCode == keyCodeEnum then
+                aimbotState = not aimbotState
+                config.aimbotBall = aimbotState
+                saveConfig()
+                if A["Aimbot Ball"] then A["Aimbot Ball"](aimbotState) end
+            end
+        end
+        if P.KeyCode == Enum.KeyCode.T and o then 
+            m = not m 
+            config.infStamina = m
+            saveConfig()
+            if A["Inf Stamina"] then A["Inf Stamina"](m) end 
+        end
+        if P.KeyCode == Enum.KeyCode.Space and infJump then
+            local ch = k.Character
+            if ch then
+                local hm = ch:FindFirstChildOfClass("Humanoid")
+                local hr = ch:FindFirstChild(a[11])
+                if hm and hr then
+                    hm:ChangeState(Enum.HumanoidStateType.Jumping)
+                    hr.AssemblyLinearVelocity = Vector3.new(hr.AssemblyLinearVelocity.X, 38, hr.AssemblyLinearVelocity.Z)
+                end
             end
         end
     end
 end)
 
-TabMove:CreateToggle({
-    Name = "Ativar Velocidade Custom",
-    CurrentValue = false,
-    Flag = "SpeedFlag",
-    Callback = function(Value)
-        isSpeedEnabled = Value
-        if not Value and LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-            LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = 16
-        end
+local R,S=0,0.03
+g.Heartbeat:Connect(function(T)
+    local U=k.Character if not U then return end
+
+    if aimbotState then
+        executarAimbotBall()
     end
-})
-
-TabMove:CreateKeybind({
-   Name = "Ativar/Desativar Velocidade no F",
-   CurrentKeybind = "F",
-   Flag = "SpeedKeybind",
-   Callback = function()
-      local Toggle = Rayfield.Flags["SpeedFlag"]
-      Toggle:Set(not Toggle.CurrentValue)
-   end,
-})
-
-TabMove:CreateSlider({
-   Name = "Velocidade (WalkSpeed)",
-   Range = {16, 60},
-   Increment = 1,
-   Suffix = " Speed",
-   CurrentValue = 16,
-   Flag = "PlayerWalkSpeed",
-   Callback = function(Value)
-      speedValue = Value
-      if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-          LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = Value
-      end
-   end,
-})
-
------------------------------------------------------------
--- PARTE 3: DESCIDA COM PLATAFORMA (SISTEMA RAYFIELD)
------------------------------------------------------------
-local ativadoDescida = false
-local plataformaGigante = nil
-local connectionNoClip = nil
-local DISTANCIA_DESCIDA = 25
-local TAMANHO_PLATAFORMA = Vector3.new(2000, 2, 2000)
-
-local function habilitarNoClip()
-    connectionNoClip = RunService.Stepped:Connect(function()
-        local character = LocalPlayer.Character
-        if character and ativadoDescida then
-            for _, part in pairs(character:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.CanCollide = false
-                end
-            end
-        end
-    end)
-end
-
-local function desabilitarNoClip()
-    if connectionNoClip then
-        connectionNoClip:Disconnect()
-        connectionNoClip = nil
-    end
-    local character = LocalPlayer.Character
-    if character then
-        for _, part in pairs(character:GetDescendants()) do
-            if part:IsA("BasePart") then
-                part.CanCollide = true
-            end
-        end
-    end
-end
-
-local function criarPlataforma(posicaoY)
-    local part = Instance.new("Part")
-    part.Size = TAMANHO_PLATAFORMA
-    part.CFrame = CFrame.new(0, posicaoY, 0)
-    part.Anchored = true
-    part.CanCollide = true
-    part.Material = Enum.Material.SmoothPlastic
-    part.Color = Color3.fromRGB(0, 170, 255)
-    part.Transparency = 0.4
-    part.Parent = workspace
-    return part
-end
-
-local function alternarDescida(estado)
-    local character = LocalPlayer.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
-    local hrp = character.HumanoidRootPart
-
-    if estado then
-        ativadoDescida = true
-        habilitarNoClip()
-        hrp.CFrame = hrp.CFrame - Vector3.new(0, DISTANCIA_DESCIDA, 0)
-        plataformaGigante = criarPlataforma(hrp.Position.Y - 3)
-    else
-        ativadoDescida = false
-        desabilitarNoClip()
-        if plataformaGigante then
-            plataformaGigante:Destroy()
-            plataformaGigante = nil
-        end
-        hrp.CFrame = hrp.CFrame + Vector3.new(0, DISTANCIA_DESCIDA, 0)
-    end
-end
-
-TabMove:CreateToggle({
-   Name = "Descida + Plataforma",
-   CurrentValue = false,
-   Flag = "DescidaFlag",
-   Callback = function(Value)
-      alternarDescida(Value)
-   end,
-})
-
-TabMove:CreateKeybind({
-   Name = "Ativar/Desativar no Q",
-   CurrentKeybind = "Q",
-   Flag = "DescidaKeybind",
-   Callback = function()
-      local Toggle = Rayfield.Flags["DescidaFlag"]
-      Toggle:Set(not Toggle.CurrentValue)
-   end,
-})
-
------------------------------------------------------------
--- PARTE 4: SISTEMA ESP DRAWING (ABA 3)
------------------------------------------------------------
-local Box_Color = Color3.fromRGB(160, 32, 240) 
-local Name_Color = Color3.fromRGB(255, 255, 255) 
-local Name_Size = 14
-
-local ALVO_ESPECIAL = "mnrzin_15"
-local Aliado_Box_Color = Color3.fromRGB(0, 255, 0) 
-local Aliado_Name_Color = Color3.fromRGB(0, 255, 0) 
-local Aliado_Name_Size = 16 
-
-_G.ESP_Enabled = false
-
-local Active_ESPs = {}
-local CreateESP
-
-local function charAddedAction(player)
-    if not _G.ESP_Enabled then return end
-    if Active_ESPs[player] then
-        Active_ESPs[player]() 
-    end
-    CreateESP(player)
-end
-
-CreateESP = function(player)
-    if player == LocalPlayer then return end
-    if Active_ESPs[player] then return end 
-
-    local ehAliado = (player.Name == ALVO_ESPECIAL)
-
-    local Box = Drawing.new("Square")
-    Box.Visible = false
-    Box.Color = ehAliado and Aliado_Box_Color or Box_Color 
-    Box.Thickness = 3
-    Box.Filled = false
-
-    local Name = Drawing.new("Text")
-    Name.Visible = false
-    Name.Color = ehAliado and Aliado_Name_Color or Name_Color
-    Name.Size = ehAliado and Aliado_Name_Size or Name_Size
-    Name.Center = true
-    Name.Outline = true
-    Name.OutlineColor = Color3.fromRGB(0, 0, 0)
-
-    local Connection
     
-    local function CleanUp()
-        Box.Visible = false
-        Name.Visible = false
-        Box:Remove()
-        Name:Remove()
-        if Connection then Connection:Disconnect() end
-        Active_ESPs[player] = nil
+    if effectiveStaminaActive or speedToggle then
+        local targetSpd = speedToggle and speedValue or y
+        local V=U:FindFirstChildOfClass("Humanoid")
+        local W=U:FindFirstChild(a[11])
+        if W and V and V.Health>0 then
+            local X=V.MoveDirection 
+            if X.Magnitude==0 then 
+                local Y=Vector3.new(W.AssemblyLinearVelocity.X,0,W.AssemblyLinearVelocity.Z)
+                if Y.Magnitude>1 then X=Y.Unit end 
+            end
+            if X.Magnitude>0 then 
+                local Z=targetSpd-z 
+                local _=Vector3.new(X.X,0,X.Z).Unit*(Z*T)
+                W.CFrame=W.CFrame+_ 
+            end
+        end
     end
 
-    Connection = RunService.RenderStepped:Connect(function()
-        if not player.Parent then
-            CleanUp()
-            return
-        end
-
-        if not _G.ESP_Enabled then
-            Box.Visible = false
-            Name.Visible = false
-            return
-        end
-
-        local isAllyNow = (player.Name == ALVO_ESPECIAL)
-        Box.Color = isAllyNow and Aliado_Box_Color or Box_Color
-        Name.Color = isAllyNow and Aliado_Name_Color or Name_Color
-
-        local char = player.Character
-        if char and char:FindFirstChild("HumanoidRootPart") and char:FindFirstChild("Humanoid") and char.Humanoid.Health > 0 then
-            local hrp = char.HumanoidRootPart
-            
-            local TopWorld = (hrp.CFrame * CFrame.new(0, 3, 0)).Position
-            local BottomWorld = (hrp.CFrame * CFrame.new(0, -3.5, 0)).Position
-
-            local TopScreen, TopOnScreen = Camera:WorldToViewportPoint(TopWorld)
-            local BottomScreen, BottomOnScreen = Camera:WorldToViewportPoint(BottomWorld)
-
-            if TopOnScreen and BottomOnScreen then
-                local Height = math.abs(TopScreen.Y - BottomScreen.Y)
-                local Width = Height / 2
-
-                Box.Size = Vector2.new(Width, Height)
-                Box.Position = Vector2.new(TopScreen.X - (Width / 2), TopScreen.Y)
-                Box.Visible = true
-
-                if isAllyNow then
-                    Name.Text = "Aliado\n" .. player.Name
-                    Name.Position = Vector2.new(TopScreen.X, TopScreen.Y - 30)
-                else
-                    Name.Text = player.Name
-                    Name.Position = Vector2.new(TopScreen.X, TopScreen.Y - 15)
+    if not l then return end
+    local a0=os.clock() if(a0-R)<S then return end R=a0
+    local a1=U:FindFirstChild(a[11])
+    local a2=U:FindFirstChildOfClass("Humanoid") 
+    if not a1 or not a2 then return end
+    if(a0-v)<r then return end
+    local a3=D() if not a3 or H(a3) then return end
+    local a4=a3.Position local a5=a1.Position local a6=(a4-a5).Magnitude
+    if a6<=q then
+        local a7=a1.CFrame:PointToObjectSpace(a4)
+        if a7.Z>=t and a7.Z<=u then
+            if math.abs(a7.X)<=1.5 then
+                if a7.Y>=1.0 then 
+                    if(a0-w)>=s and a2.FloorMaterial~=Enum.Material.Air then 
+                        w=a0 v=a0 a2.Jump=true a2:ChangeState(Enum.HumanoidStateType.Jumping)
+                    end 
                 end
-                
-                Name.Visible = true
-            else
-                Box.Visible = false
-                Name.Visible = false
+                return
             end
+            if a7.X>1.5 then v=a0 B(Enum.KeyCode.E) elseif a7.X<-1.5 then v=a0 B(Enum.KeyCode.Q) end
+        end
+    end
+end)
+
+local a8=Instance.new(a[12]) a8.Name="ZenithMobileUI" a8.Parent=f a8.ZIndexBehavior=Enum.ZIndexBehavior.Sibling
+
+local a9=Instance.new(a[13]) a9.Name="MainFrame" a9.Parent=a8 
+a9.BackgroundColor3=Color3.fromRGB(15,18,28) 
+a9.BorderColor3=Color3.fromRGB(30,40,65) 
+a9.BorderSizePixel=1 
+a9.Position=UDim2.new(0.05,0,0.2,0) 
+a9.Size=UDim2.new(0,280,0,355) 
+a9.ClipsDescendants=true
+
+local b0=Instance.new(a[14]) b0.CornerRadius=UDim.new(0,8) b0.Parent=a9
+
+local b1,b2,b3,b4
+local function b5(b6)
+    local b7=b6.Position-b3 
+    a9.Position=UDim2.new(b4.X.Scale,b4.X.Offset+b7.X,b4.Y.Scale,b4.Y.Offset+b7.Y)
+end
+a9.InputBegan:Connect(function(b8)
+    if b8.UserInputType==Enum.UserInputType.MouseButton1 or b8.UserInputType==Enum.UserInputType.Touch then 
+        b1=true b3=b8.Position b4=a9.Position 
+        b8.Changed:Connect(function() if b8.UserInputState==Enum.UserInputState.End then b1=false end end)
+    end 
+end)
+a9.InputChanged:Connect(function(b9)
+    if b9.UserInputType==Enum.UserInputType.MouseMovement or b9.UserInputType==Enum.UserInputType.Touch then b2=b9 end 
+end)
+d.InputChanged:Connect(function(c0) if c0==b2 and b1 then b5(c0) end end)
+
+local c1=Instance.new(a[13]) c1.Name="Header" c1.Parent=a9 c1.BackgroundTransparency=1 c1.Size=UDim2.new(1,0,0,34)
+local c2=Instance.new(a[15]) c2.Parent=c1 c2.BackgroundTransparency=1 c2.Position=UDim2.new(0,10,0,5) c2.Size=UDim2.new(0,120,0,14) c2.Font=Enum.Font.GothamBold c2.Text="YTDRACOSWOR" c2.TextColor3=Color3.fromRGB(255,255,255) c2.TextSize=13 c2.TextXAlignment=Enum.TextXAlignment.Left
+local c3=Instance.new(a[15]) c3.Parent=c1 c3.BackgroundTransparency=1 c3.Position=UDim2.new(0,10,0,18) c3.Size=UDim2.new(0,120,0,12) c3.Font=Enum.Font.Gotham c3.Text="Goalkeeper" c3.TextColor3=Color3.fromRGB(120,130,160) c3.TextSize=9 c3.TextXAlignment=Enum.TextXAlignment.Left
+local c4=Instance.new(a[15]) c4.Parent=c1 c4.BackgroundTransparency=1 c4.Position=UDim2.new(1,-70,0,8) c4.Size=UDim2.new(0,40,0,16) c4.Font=Enum.Font.GothamBold c4.Text="v1.2.2" c4.TextColor3=Color3.fromRGB(60,180,140) c4.TextSize=10
+local c5=Instance.new(a[16]) c5.Name="MinimizeBtn" c5.Parent=c1 c5.BackgroundColor3=Color3.fromRGB(25,30,45) c5.Position=UDim2.new(1,-26,0,6) c5.Size=UDim2.new(0,20,0,20) c5.Font=Enum.Font.GothamBold c5.Text="-" c5.TextColor3=Color3.fromRGB(200,210,240) c5.TextSize=13
+local c6=Instance.new(a[14]) c6.CornerRadius=UDim.new(0,5) c6.Parent=c5
+
+local c7=Instance.new(a[13]) c7.Name="Container" c7.Parent=a9 c7.BackgroundTransparency=1 c7.Position=UDim2.new(0,8,0,36) c7.Size=UDim2.new(1,-16,1,-52)
+local c8=Instance.new(a[17]) c8.Parent=c7 c8.SortOrder=Enum.SortOrder.LayoutOrder c8.Padding=UDim.new(0,3)
+
+local c9=Instance.new(a[15]) c9.Name="CreditsLabel" c9.Parent=a9 c9.BackgroundTransparency=1 c9.Position=UDim2.new(0,0,1,-16) c9.Size=UDim2.new(1,0,0,14) c9.Font=Enum.Font.GothamBold c9.Text="Created by YT Dracoswor" c9.TextColor3=Color3.fromRGB(110,125,160) c9.TextSize=10 c9.TextXAlignment=Enum.TextXAlignment.Center
+
+c5.MouseButton1Click:Connect(function()
+    p=not p
+    local d0=p and UDim2.new(0,280,0,34) or UDim2.new(0,280,0,355)
+    c5.Text=p and "+" or "-"
+    c7.Visible=not p c9.Visible=not p
+    e:Create(a9,TweenInfo.new(0.3,Enum.EasingStyle.Quart,Enum.EasingDirection.Out),{Size=d0}):Play()
+end)
+
+local function addSpacer(height)
+    local sp = Instance.new(a[13]) sp.Parent = c7 sp.BackgroundTransparency = 1 sp.Size = UDim2.new(1,0,0,height)
+end
+
+local function addInfoRow(d2, d3)
+    local d6=Instance.new(a[13]) d6.Parent=c7 d6.BackgroundColor3=Color3.fromRGB(22,26,40) d6.Size=UDim2.new(1,0,0,34)
+    local d7=Instance.new(a[14]) d7.CornerRadius=UDim.new(0,6) d7.Parent=d6
+    local d8=Instance.new(a[15]) d8.Parent=d6 d8.BackgroundTransparency=1 d8.Position=UDim2.new(0,8,0,3) d8.Font=Enum.Font.GothamBold d8.Text=d2 d8.TextColor3=Color3.fromRGB(255,255,255) d8.TextSize=11 d8.TextXAlignment=Enum.TextXAlignment.Left
+    local d9=Instance.new(a[15]) d9.Parent=d6 d9.BackgroundTransparency=1 d9.Position=UDim2.new(0,8,0,18) d9.Font=Enum.Font.Gotham d9.Text=d3 d9.TextColor3=Color3.fromRGB(110,120,150) d9.TextSize=9 d9.TextXAlignment=Enum.TextXAlignment.Left
+    
+    local st=Instance.new(a[15]) st.Parent=d6 st.BackgroundTransparency=1 st.Position=UDim2.new(1,-75,0,0) st.Size=UDim2.new(0,67,1,0) st.Font=Enum.Font.GothamBold st.Text="[Ativado]" st.TextColor3=Color3.fromRGB(60,180,140) st.TextSize=10 st.TextXAlignment=Enum.TextXAlignment.Right
+end
+
+local function d1(d2,d3,d4,d5)
+    local d6=Instance.new(a[13]) d6.Parent=c7 d6.BackgroundColor3=Color3.fromRGB(22,26,40) d6.Size=UDim2.new(1,0,0,34)
+    local d7=Instance.new(a[14]) d7.CornerRadius=UDim.new(0,6) d7.Parent=d6
+    local d8=Instance.new(a[15]) d8.Parent=d6 d8.BackgroundTransparency=1 d8.Position=UDim2.new(0,8,0,3) d8.Font=Enum.Font.GothamBold d8.Text=d2 d8.TextColor3=Color3.fromRGB(255,255,255) d8.TextSize=11 d8.TextXAlignment=Enum.TextXAlignment.Left
+    local d9=Instance.new(a[15]) d9.Parent=d6 d9.BackgroundTransparency=1 d9.Position=UDim2.new(0,8,0,18) d9.Font=Enum.Font.Gotham d9.Text=d3 d9.TextColor3=Color3.fromRGB(110,120,150) d9.TextSize=9 d9.TextXAlignment=Enum.TextXAlignment.Left
+    local e0=Instance.new(a[16]) e0.Parent=d6 e0.BackgroundColor3=d4 and Color3.fromRGB(65,140,240) or Color3.fromRGB(40,45,65) e0.Position=UDim2.new(1,-42,0.5,-10) e0.Size=UDim2.new(0,34,0,20) e0.Text=""
+    local e1=Instance.new(a[14]) e1.CornerRadius=UDim.new(1,0) e1.Parent=e0
+    local e2=Instance.new(a[13]) e2.Parent=e0 e2.BackgroundColor3=Color3.fromRGB(255,255,255) e2.Position=d4 and UDim2.new(1,-16,0.5,-6) or UDim2.new(0,3,0.5,-6) e2.Size=UDim2.new(0,12,0,12)
+    local e3=Instance.new(a[14]) e3.CornerRadius=UDim.new(1,0) e3.Parent=e2
+    local e4=d4
+    local function e5(e6)
+        e4=e6 
+        local e7=e6 and UDim2.new(1,-16,0.5,-6) or UDim2.new(0,3,0.5,-6)
+        local e8=e6 and Color3.fromRGB(65,140,240) or Color3.fromRGB(40,45,65)
+        e:Create(e2,TweenInfo.new(0.2),{Position=e7}):Play()
+        e:Create(e0,TweenInfo.new(0.2),{BackgroundColor3=e8}):Play()
+    end
+    e0.MouseButton1Click:Connect(function() e4=not e4 e5(e4) d5(e4) end)
+    A[d2]=function(e9) e5(e9) end
+end
+
+local function d1Keybind(d2,d3,d4,d5)
+    local d6=Instance.new(a[13]) d6.Parent=c7 d6.BackgroundColor3=Color3.fromRGB(22,26,40) d6.Size=UDim2.new(1,0,0,34)
+    local d7=Instance.new(a[14]) d7.CornerRadius=UDim.new(0,6) d7.Parent=d6
+    local d8=Instance.new(a[15]) d8.Parent=d6 d8.BackgroundTransparency=1 d8.Position=UDim2.new(0,8,0,3) d8.Font=Enum.Font.GothamBold d8.Text=d2 d8.TextColor3=Color3.fromRGB(255,255,255) d8.TextSize=11 d8.TextXAlignment=Enum.TextXAlignment.Left
+    local d9=Instance.new(a[15]) d9.Parent=d6 d9.BackgroundTransparency=1 d9.Position=UDim2.new(0,8,0,18) d9.Font=Enum.Font.Gotham d9.Text=d3 d9.TextColor3=Color3.fromRGB(110,120,150) d9.TextSize=9 d9.TextXAlignment=Enum.TextXAlignment.Left
+    
+    local keyBox=Instance.new(a[18]) keyBox.Parent=d6 keyBox.Size=UDim2.new(0,30,0,20) keyBox.Position=UDim2.new(1,-78,0.5,-10) keyBox.BackgroundColor3=Color3.fromRGB(30,36,55) keyBox.Text=currentAimbotKey keyBox.TextColor3=Color3.fromRGB(255,255,255) keyBox.Font=Enum.Font.GothamBold keyBox.TextSize=10 keyBox.ClearTextOnFocus=false
+    local keyBoxCorner=Instance.new(a[14]) keyBoxCorner.CornerRadius=UDim.new(0,4) keyBoxCorner.Parent=keyBox
+    
+    keyBox.FocusLost:Connect(function()
+        local txt = keyBox.Text:upper()
+        if txt ~= "" and pcall(function() return Enum.KeyCode[txt] end) then
+            currentAimbotKey = txt
+            keyBox.Text = txt
+            config.aimbotKey = txt
+            saveConfig()
         else
-            Box.Visible = false
-            Name.Visible = false
+            keyBox.Text = currentAimbotKey
         end
     end)
 
-    local ResetConnection
-    ResetConnection = player.CharacterAdded:Connect(function()
-        CleanUp()
-        ResetConnection:Disconnect()
-        charAddedAction(player)
-    end)
-
-    local LeaveConnection
-    LeaveConnection = Players.PlayerRemoving:Connect(function(leftPlayer)
-        if leftPlayer == player then
-            CleanUp()
-            LeaveConnection:Disconnect()
-        end
-    end)
-
-    Active_ESPs[player] = CleanUp
-end
-
-local function StartESPSystem()
-    for _, player in ipairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer then
-            player.CharacterAdded:Connect(function()
-                charAddedAction(player)
-            end)
-        end
+    local e0=Instance.new(a[16]) e0.Parent=d6 e0.BackgroundColor3=d4 and Color3.fromRGB(65,140,240) or Color3.fromRGB(40,45,65) e0.Position=UDim2.new(1,-42,0.5,-10) e0.Size=UDim2.new(0,34,0,20) e0.Text=""
+    local e1=Instance.new(a[14]) e1.CornerRadius=UDim.new(1,0) e1.Parent=e0
+    local e2=Instance.new(a[13]) e2.Parent=e0 e2.BackgroundColor3=Color3.fromRGB(255,255,255) e2.Position=d4 and UDim2.new(1,-16,0.5,-6) or UDim2.new(0,3,0.5,-6) e2.Size=UDim2.new(0,12,0,12)
+    local e3=Instance.new(a[14]) e3.CornerRadius=UDim.new(1,0) e3.Parent=e2
+    local e4=d4
+    local function e5(e6)
+        e4=e6 
+        local e7=e6 and UDim2.new(1,-16,0.5,-6) or UDim2.new(0,3,0.5,-6)
+        local e8=e6 and Color3.fromRGB(65,140,240) or Color3.fromRGB(40,45,65)
+        e:Create(e2,TweenInfo.new(0.2),{Position=e7}):Play()
+        e:Create(e0,TweenInfo.new(0.2),{BackgroundColor3=e8}):Play()
     end
+    e0.MouseButton1Click:Connect(function() e4=not e4 e5(e4) d5(e4) end)
+end
+
+local function d1Speed(d2,d3,d4,d5,d6_val)
+    local d6=Instance.new(a[13]) d6.Parent=c7 d6.BackgroundColor3=Color3.fromRGB(22,26,40) d6.Size=UDim2.new(1,0,0,34)
+    local d7=Instance.new(a[14]) d7.CornerRadius=UDim.new(0,6) d7.Parent=d6
+    local d8=Instance.new(a[15]) d8.Parent=d6 d8.BackgroundTransparency=1 d8.Position=UDim2.new(0,8,0,3) d8.Font=Enum.Font.GothamBold d8.Text=d2 d8.TextColor3=Color3.fromRGB(255,255,255) d8.TextSize=11 d8.TextXAlignment=Enum.TextXAlignment.Left
+    local d9=Instance.new(a[15]) d9.Parent=d6 d9.BackgroundTransparency=1 d9.Position=UDim2.new(0,8,0,18) d9.Font=Enum.Font.Gotham d9.Text=d3 d9.TextColor3=Color3.fromRGB(110,120,150) d9.TextSize=9 d9.TextXAlignment=Enum.TextXAlignment.Left
     
-    Players.PlayerAdded:Connect(function(player)
-        player.CharacterAdded:Connect(function()
-            charAddedAction(player)
-        end)
-        charAddedAction(player)
-    end)
-end
-
-StartESPSystem()
-
--- Controles na Interface Rayfield (Aba 3: ESP)
-TabESP:CreateToggle({
-   Name = "Ativar ESP Players",
-   CurrentValue = false,
-   Flag = "PlayerESPActiveFlag",
-   Callback = function(Value)
-      _G.ESP_Enabled = Value
-      if _G.ESP_Enabled then
-          for _, player in ipairs(Players:GetPlayers()) do
-              if player ~= LocalPlayer then
-                  charAddedAction(player)
-              end
-          end
-      end
-   end,
-})
-
-TabESP:CreateColorPicker({
-    Name = "Cor do ESP (Jogadores)",
-    Color = Box_Color,
-    Flag = "PlayerESPColorFlag",
-    Callback = function(Value)
-        Box_Color = Value
-    end,
-})
-
------------------------------------------------------------
--- ABA CONFIG ⚙️ (ABA 4 - ÚLTIMA ABA DAS CONFIGURAÇÕES)
------------------------------------------------------------
-TabConfig:CreateSection("LOAD HUD")
-
-TabConfig:CreateButton({
-   Name = "LOAD CONFIG",
-   Callback = function()
-       Rayfield:LoadConfiguration()
-       Rayfield:Notify({
-           Title = "Configurações",
-           Content = "HUD carregado com sucesso!",
-           Duration = 3,
-           Image = 4483362458,
-       })
-   end,
-})
-
-TabConfig:CreateSection("OUTRAS OPÇÕES")
-
-TabConfig:CreateDropdown({
-   Name = "Gerenciar HUD",
-   Options = {"⬇️", "Salvar HUD", "Deletar HUD"},
-   CurrentOption = {"⬇️"},
-   MultipleOptions = false,
-   Flag = "GerenciadorHUDDropdown",
-   Callback = function(Option)
-      local selecionado = type(Option) == "table" and Option[1] or Option
-      
-      if selecionado == "Salvar HUD" then
-          Rayfield:Notify({
-              Title = "Configurações",
-              Content = "Configurações do HUD salvas com sucesso!",
-              Duration = 3,
-              Image = 4483362458,
-          })
-      elseif selecionado == "Deletar HUD" then
-          if readfile and isfile and isfile("RayfieldConfig/MinhaConfig.rfld") then
-              delfile("RayfieldConfig/MinhaConfig.rfld")
-              Rayfield:Notify({
-                  Title = "Configurações",
-                  Content = "Arquivo de configuração deletado!",
-                  Duration = 3,
-                  Image = 4483362458,
-              })
-          else
-              Rayfield:Notify({
-                  Title = "Aviso",
-                  Content = "Nenhum arquivo de configuração encontrado para deletar.",
-                  Duration = 3,
-                  Image = 4483362458,
-              })
-          end
-      end
-   end,
-})
-
-
-        while autoAttackActive and lockedTarget and getgenv().AutoAttackRodando do
-            if lockedTarget.Character and lockedTarget.Character:FindFirstChild("HumanoidRootPart") and lockedTarget.Character:FindFirstChildOfClass("Humanoid").Health > 0 then
-                local myChar = LocalPlayer.Character
-                if myChar and myChar:FindFirstChild("HumanoidRootPart") then
-                    equipBat()
-                    
-                    local targetHRP = lockedTarget.Character.HumanoidRootPart
-                    local targetHumanoid = lockedTarget.Character:FindFirstChildOfClass("Humanoid")
-                    local targetCFrame = targetHRP.CFrame
-                    
-                    if targetHumanoid and targetHumanoid.MoveDirection.Magnitude > 0 then
-                        targetCFrame = targetHRP.CFrame * CFrame.new(0, 0, -OFFSET_STUDS)
-                    end
-                    
-                    local distance = (targetCFrame.Position - myChar.HumanoidRootPart.Position).Magnitude
-                    local tweenTime = distance / TWEEN_SPEED
-                    local tweenInfo = TweenInfo.new(tweenTime, Enum.EasingStyle.Linear)
-                    
-                    currentTween = TweenService:Create(myChar.HumanoidRootPart, tweenInfo, {CFrame = targetCFrame})
-                    currentTween:Play()
-                    
-                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, true, game, 0)
-                    task.wait(0.05)
-                    VirtualInputManager:SendMouseButtonEvent(0, 0, 0, false, game, 0)
-                end
-            else
-                break
-            end
-            task.wait(0.1)
+    local inp=Instance.new(a[18]) inp.Parent=d6 inp.Size=UDim2.new(0,35,0,18) inp.Position=UDim2.new(1,-82,0.5,-9) inp.BackgroundColor3=Color3.fromRGB(30,36,55) inp.Text=tostring(d6_val) inp.TextColor3=Color3.fromRGB(255,255,255) inp.Font=Enum.Font.GothamBold inp.TextSize=10 inp.ClearTextOnFocus=false
+    local inpc=Instance.new(a[14]) inpc.CornerRadius=UDim.new(0,4) inpc.Parent=inp
+    
+    inp.FocusLost:Connect(function()
+        local val=tonumber(inp.Text)
+        if val then 
+            speedValue=val 
+            config.speedValue=val
+            saveConfig()
+        else 
+            inp.Text=tostring(speedValue) 
         end
-        
-        if currentTween then currentTween:Cancel() end
     end)
+
+    local e0=Instance.new(a[16]) e0.Parent=d6 e0.BackgroundColor3=d4 and Color3.fromRGB(65,140,240) or Color3.fromRGB(40,45,65) e0.Position=UDim2.new(1,-42,0.5,-10) e0.Size=UDim2.new(0,34,0,20) e0.Text=""
+    local e1=Instance.new(a[14]) e1.CornerRadius=UDim.new(1,0) e1.Parent=e0
+    local e2=Instance.new(a[13]) e2.Parent=e0 e2.BackgroundColor3=Color3.fromRGB(255,255,255) e2.Position=d4 and UDim2.new(1,-16,0.5,-6) or UDim2.new(0,3,0.5,-6) e2.Size=UDim2.new(0,12,0,12)
+    local e3=Instance.new(a[14]) e3.CornerRadius=UDim.new(1,0) e3.Parent=e2
+    local e4=d4
+    local function e5(e6)
+        e4=e6 
+        local e7=e6 and UDim2.new(1,-16,0.5,-6) or UDim2.new(0,3,0.5,-6)
+        local e8=e6 and Color3.fromRGB(65,140,240) or Color3.fromRGB(40,45,65)
+        e:Create(e2,TweenInfo.new(0.2),{Position=e7}):Play()
+        e:Create(e0,TweenInfo.new(0.2),{BackgroundColor3=e8}):Play()
+    end
+    e0.MouseButton1Click:Connect(function() e4=not e4 e5(e4) d5(e4) end)
 end
 
+local function d1StaminaWithMode(d2, d3, d4, d5, currentMode, onModeChange)
+    local d6=Instance.new(a[13]) d6.Parent=c7 d6.BackgroundColor3=Color3.fromRGB(22,26,40) d6.Size=UDim2.new(1,0,0,34)
+    local d7=Instance.new(a[14]) d7.CornerRadius=UDim.new(0,6) d7.Parent=d6
+    local d8=Instance.new(a[15]) d8.Parent=d6 d8.BackgroundTransparency=1 d8.Position=UDim2.new(0,8,0,3) d8.Font=Enum.Font.GothamBold d8.Text=d2 d8.TextColor3=Color3.fromRGB(255,255,255) d8.TextSize=11 d8.TextXAlignment=Enum.TextXAlignment.Left
+    local d9=Instance.new(a[15]) d9.Parent=d6 d9.BackgroundTransparency=1 d9.Position=UDim2.new(0,8,0,18) d9.Font=Enum.Font.Gotham d9.Text=d3 d9.TextColor3=Color3.fromRGB(110,120,150) d9.TextSize=9 d9.TextXAlignment=Enum.TextXAlignment.Left
+    
+    local timeContainer=Instance.new(a[13]) timeContainer.Parent=d6 timeContainer.BackgroundTransparency=1 timeContainer.Position=UDim2.new(1,-175,0.5,-10) timeContainer.Size=UDim2.new(0,44,0,20)
+    timeContainer.Visible = (currentMode == 2)
+
+    local boxActive=Instance.new(a[18]) boxActive.Parent=timeContainer boxActive.Size=UDim2.new(0,20,0,20) boxActive.Position=UDim2.new(0,0,0,0) boxActive.BackgroundColor3=Color3.fromRGB(30,36,55) boxActive.Text=tostring(staminaActiveTime) boxActive.TextColor3=Color3.fromRGB(255,255,255) boxActive.Font=Enum.Font.GothamBold boxActive.TextSize=9 boxActive.ClearTextOnFocus=false
+    local cActive=Instance.new(a[14]) cActive.CornerRadius=UDim.new(0,4) cActive.Parent=boxActive
+    
+    boxActive.FocusLost:Connect(function()
+        local val = tonumber(boxActive.Text)
+        if val and val > 0 then
+            staminaActiveTime = val
+            config.staminaActiveTime = val
+            saveConfig()
+        else
+            boxActive.Text = tostring(staminaActiveTime)
+        end
+    end)
+
+    local boxDeactive=Instance.new(a[18]) boxDeactive.Parent=timeContainer boxDeactive.Size=UDim2.new(0,20,0,20) boxDeactive.Position=UDim2.new(0,23,0,0) boxDeactive.BackgroundColor3=Color3.fromRGB(30,36,55) boxDeactive.Text=tostring(staminaDeactiveTime) boxDeactive.TextColor3=Color3.fromRGB(255,255,255) boxDeactive.Font=Enum.Font.GothamBold boxDeactive.TextSize=9 boxDeactive.ClearTextOnFocus=false
+    local cDeactive=Instance.new(a[14]) cDeactive.CornerRadius=UDim.new(0,4) cDeactive.Parent=boxDeactive
+    
+    boxDeactive.FocusLost:Connect(function()
+        local val = tonumber(boxDeactive.Text)
+        if val and val >= 0 then
+            staminaDeactiveTime = val
+            config.staminaDeactiveTime = val
+            saveConfig()
+        else
+            boxDeactive.Text = tostring(staminaDeactiveTime)
+        end
+    end)
+
+    local btnMode=Instance.new(a[16]) btnMode.Parent=d6 btnMode.BackgroundColor3=Color3.fromRGB(45,55,80) btnMode.Position=UDim2.new(1,-128,0.5,-10) btnMode.Size=UDim2.new(0,80,0,20)
+    btnMode.Font=Enum.Font.GothamBold btnMode.Text = (currentMode == 1) and "Normal" or "Stamina"
+    btnMode.TextColor3=Color3.fromRGB(255,255,255) btnMode.TextSize=9
+    local btnCorner=Instance.new(a[14]) btnCorner.CornerRadius=UDim.new(0,4) btnCorner.Parent=btnMode
+    
+    btnMode.MouseButton1Click:Connect(function()
+        if staminaMode == 1 then
+            staminaMode = 2
+            btnMode.Text = "Stamina"
+            timeContainer.Visible = true
+        else
+            staminaMode = 1
+            btnMode.Text = "Normal"
+            timeContainer.Visible = false
+        end
+        onModeChange(staminaMode)
+    end)
+
+    local e0=Instance.new(a[16]) e0.Parent=d6 e0.BackgroundColor3=d4 and Color3.fromRGB(65,140,240) or Color3.fromRGB(40,45,65) e0.Position=UDim2.new(1,-42,0.5,-10) e0.Size=UDim2.new(0,34,0,20) e0.Text=""
+    local e1=Instance.new(a[14]) e1.CornerRadius=UDim.new(1,0) e1.Parent=e0
+    local e2=Instance.new(a[13]) e2.Parent=e0 e2.BackgroundColor3=Color3.fromRGB(255,255,255) e2.Position=d4 and UDim2.new(1,-16,0.5,-6) or UDim2.new(0,3,0.5,-6) e2.Size=UDim2.new(0,12,0,12)
+    local e3=Instance.new(a[14]) e3.CornerRadius=UDim.new(1,0) e3.Parent=e2
+    local e4=d4
+    local function e5(e6)
+        e4=e6 
+        local e7=e6 and UDim2.new(1,-16,0.5,-6) or UDim2.new(0,3,0.5,-6)
+        local e8=e6 and Color3.fromRGB(65,140,240) or Color3.fromRGB(40,45,65)
+        e:Create(e2,TweenInfo.new(0.2),{Position=e7}):Play()
+        e:Create(e0,TweenInfo.new(0.2),{BackgroundColor3=e8}):Play()
+    end
+    e0.MouseButton1Click:Connect(function() e4=not e4 e5(e4) d5(e4) end)
+end
+
+d1StaminaWithMode("Inf Stamina", "Booster 26", config.infStamina, function(f1)
+    m = f1
+    config.infStamina = f1
+    saveConfig()
+end, staminaMode, function(newMode)
+    staminaMode = newMode
+    config.staminaMode = newMode
+    saveConfig()
+end)
+
+d1("Auto Dive","Auto save script",config.autoDive,function(f0) l=f0 config.autoDive=f0 saveConfig() end)
+d1("Aimbot Ball","Auto aim ball",config.aimbotBall,function(fA) aimbotState=fA config.aimbotBall=fA saveConfig() end)
+d1("Infinite Jump","Jump infinitely",config.infJump,function(f4) infJump=f4 config.infJump=f4 saveConfig() end)
+d1Speed("Speed","Custom speed",config.speedToggle,function(f5) speedToggle=f5 config.speedToggle=f5 saveConfig() end, speedValue)
+addSpacer(4)
+d1Keybind("Keybind Aimbot","Enable/Disable Aimbot Key",config.keybindAimbot,function(f2) keybindAimbotEnabled=f2 config.keybindAimbot=f2 saveConfig() end)
+d1("Keybind T","Enable/Disable T Key",config.keybindT,function(f3) o=f3 config.keybindT=f3 saveConfig() end)
+addInfoRow("Anti Kick","Auto Rejoin",true)
+
+-- =====================================================================
+-- PAINEL DE COMANDOS (Alt + W) - Com senha salva e seletor de jogadores do script
+-- =====================================================================
+do
+    local UIS = d
+    local TweenService = e
+    local RunService = g
+    local lp = k
+    local PASSWORD = config.cmdPassword or "anexushl"
+
+    if f:FindFirstChild("ZenithCommandsUI") then f.ZenithCommandsUI:Destroy() end
+
+    local unlocked = false
+    local panelOpen = false
+    local selectedTarget = nil
+
+    local COR_FUNDO = Color3.fromRGB(15, 18, 28)
+    local COR_BORDA = Color3.fromRGB(30, 40, 65)
+    local COR_AZUL = Color3.fromRGB(65, 140, 240)
+    local COR_CAIXA = Color3.fromRGB(30, 36, 55)
+    local COR_BRANCO = Color3.fromRGB(255, 255, 255)
+    local COR_CINZA = Color3.fromRGB(110, 120, 150)
+    local COR_VERMELHO = Color3.fromRGB(200, 70, 70)
+
+    local function newCorner(parent, radius)
+        local c = Instance.new("UICorner")
+        c.CornerRadius = UDim.new(0, radius)
+        c.Parent = parent
+        return c
+    end
+
+    local function newText(parent, text, pos, size, font, color, textSize, align)
+        local t = Instance.new("TextLabel")
+        t.Parent = parent
+        t.BackgroundTransparency = 1
+        t.Position = pos
+        t.Size = size
+        t.Font = font
+        t.Text = text
+        t.TextColor3 = color
+        t.TextSize = textSize
+        t.TextXAlignment = align or Enum.TextXAlignment.Left
+        return t
+    end
+
+    local function newButton(parent, text, pos, size, bg, textSize)
+        local b = Instance.new("TextButton")
+        b.Parent = parent
+        b.BackgroundColor3 = bg
+        b.Position = pos
+        b.Size = size
+        b.Font = Enum.Font.GothamBold
+        b.Text = text
+        b.TextColor3 = COR_BRANCO
+        b.TextSize = textSize or 10
+        b.AutoButtonColor = true
+        newCorner(b, 5)
+        return b
+    end
+
+    local function newBox(parent, text, placeholder, pos, size)
+        local tb = Instance.new("TextBox")
+        tb.Parent = parent
+        tb.BackgroundColor3 = COR_CAIXA
+        tb.Position = pos
+        tb.Size = size
+        tb.Font = Enum.Font.GothamBold
+        tb.Text = text
+        tb.PlaceholderText = placeholder
+        tb.PlaceholderColor3 = COR_CINZA
+        tb.TextColor3 = COR_BRANCO
+        tb.TextSize = 10
+        tb.ClearTextOnFocus = false
+        newCorner(tb, 4)
+        return tb
+    end
+
+    local cmdGui = Instance.new("ScreenGui")
+    cmdGui.Name = "ZenithCommandsUI"
+    cmdGui.ResetOnSpawn = false
+    cmdGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    cmdGui.Parent = f
+
+    -- ================= TELA DE SENHA =================
+    local prompt = Instance.new("Frame")
+    prompt.Name = "PasswordPrompt"
+    prompt.Parent = cmdGui
+    prompt.BackgroundColor3 = COR_FUNDO
+    prompt.BorderColor3 = COR_BORDA
+    prompt.BorderSizePixel = 1
+    prompt.Position = UDim2.new(0.5, -130, 0.5, -70)
+    prompt.Size = UDim2.new(0, 260, 0, 140)
+    prompt.Visible = false
+    newCorner(prompt, 8)
+
+    newText(prompt, "Acesso restrito", UDim2.new(0, 12, 0, 8), UDim2.new(1, -50, 0, 16), Enum.Font.GothamBold, COR_BRANCO, 13)
+    newText(prompt, "Digite a senha para liberar os comandos", UDim2.new(0, 12, 0, 26), UDim2.new(1, -24, 0, 12), Enum.Font.Gotham, Color3.fromRGB(120, 130, 160), 9)
+
+    local promptClose = newButton(prompt, "X", UDim2.new(1, -30, 0, 6), UDim2.new(0, 20, 0, 20), Color3.fromRGB(25, 30, 45), 11)
+    local passBox = newBox(prompt, "", "Senha", UDim2.new(0, 12, 0, 48), UDim2.new(1, -24, 0, 28))
+    passBox.TextSize = 12
+    local errLabel = newText(prompt, "", UDim2.new(0, 12, 0, 80), UDim2.new(1, -24, 0, 12), Enum.Font.Gotham, COR_VERMELHO, 9)
+    local enterBtn = newButton(prompt, "Entrar", UDim2.new(0, 12, 1, -34), UDim2.new(1, -24, 0, 24), COR_AZUL, 11)
+
+    promptClose.MouseButton1Click:Connect(function()
+        prompt.Visible = false
+        passBox.Text = ""
+        errLabel.Text = ""
+    end)
+
+    -- ================= PAINEL GRANDE =================
+    local panel = Instance.new("Frame")
+    panel.Name = "CommandsPanel"
+    panel.Parent = cmdGui
+    panel.BackgroundColor3 = COR_FUNDO
+    panel.BorderColor3 = COR_BORDA
+    panel.BorderSizePixel = 1
+    panel.Position = UDim2.new(0.5, -160, 0.5, -130)
+    panel.Size = UDim2.new(0, 320, 0, 270)
+    panel.ClipsDescendants = true
+    panel.Visible = false
+    newCorner(panel, 8)
+
+    local header = Instance.new("Frame")
+    header.Name = "Header"
+    header.Parent = panel
+    header.BackgroundTransparency = 1
+    header.Size = UDim2.new(1, 0, 0, 34)
+    newText(header, "COMANDOS & SCRIPT USERS", UDim2.new(0, 10, 0, 5), UDim2.new(0, 200, 0, 14), Enum.Font.GothamBold, COR_BRANCO, 13)
+    newText(header, "Selecione o alvo que usa o script", UDim2.new(0, 10, 0, 18), UDim2.new(0, 200, 0, 12), Enum.Font.Gotham, Color3.fromRGB(120, 130, 160), 9)
+
+    local panelClose = newButton(panel, "X", UDim2.new(1, -28, 0, 6), UDim2.new(0, 20, 0, 20), Color3.fromRGB(25, 30, 45), 11)
+    panelClose.MouseButton1Click:Connect(function()
+        panel.Visible = false
+        panelOpen = false
+    end)
+
+    local content = Instance.new("ScrollingFrame")
+    content.Name = "Content"
+    content.Parent = panel
+    content.BackgroundTransparency = 1
+    content.Position = UDim2.new(0, 8, 0, 40)
+    content.Size = UDim2.new(1, -16, 1, -48)
+    content.CanvasSize = UDim2.new(0, 0, 0, 240)
+    content.ScrollBarThickness = 4
+
+    local layout = Instance.new("UIListLayout")
+    layout.Parent = content
+    layout.SortOrder = Enum.SortOrder.LayoutOrder
+    layout.Padding = UDim.new(0, 6)
+
+    -- Seção de Seleção de Usuários do Script
+    newText(content, "Jogadores com o Script no Servidor:", UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 14), Enum.Font.GothamBold, COR_BRANCO, 10)
+    
+    local dropdownBtn = newButton(content, "Nenhum usuário encontrado", UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 28), COR_CAIXA, 11)
+    
+    local playerListFrame = Instance.new("Frame")
+    playerListFrame.Parent = content
+    playerListFrame.BackgroundColor3 = Color3.fromRGB(22, 26, 40)
+    playerListFrame.Size = UDim2.new(1, 0, 0, 90)
+    playerListFrame.Visible = false
+    newCorner(playerListFrame, 5)
+
+    local playerListScroll = Instance.new("ScrollingFrame")
+    playerListScroll.Parent = playerListFrame
+    playerListScroll.BackgroundTransparency = 1
+    playerListScroll.Size = UDim2.new(1, 0, 1, 0)
+    playerListScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+    playerListScroll.ScrollBarThickness = 3
+    
+    local playerListLayout = Instance.new("UIListLayout")
+    playerListLayout.Parent = playerListScroll
+    playerListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+
+    dropdownBtn.MouseButton1Click:Connect(function()
+        playerListFrame.Visible = not playerListFrame.Visible
+        -- Atualizar lista de jogadores com o script (procurando por um identificador no player, ex: UI ou pasta)
+        for _, child in ipairs(playerListScroll:GetChildren()) do
+            if child:IsA("TextButton") then child:Destroy() end
+        end
+
+        local count = 0
+        for _, p in ipairs(h:GetPlayers()) do
+            if p ~= lp and p.PlayerGui:FindFirstChild("ZenithMobileUI") then
+                count = count + 1
+                local pBtn = newButton(playerListScroll, p.Name, UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 24), Color3.fromRGB(30, 36, 55), 10)
+                pBtn.MouseButton1Click:Connect(function()
+                    selectedTarget = p
+                    dropdownBtn.Text = "Alvo: " .. p.Name
+                    playerListFrame.Visible = false
+                end)
+            end
+        end
+        if count == 0 then
+            dropdownBtn.Text = "Nenhum outro usuário do script"
+            selectedTarget = nil
+        end
+        playerListScroll.CanvasSize = UDim2.new(0, 0, 0, count * 24)
+    end)
+
+    newText(content, "Ações nos Comandos:", UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 14), Enum.Font.GothamBold, COR_BRANCO, 10)
+
+    local killBtn = newButton(content, "Executar Kill no Alvo Selecionado", UDim2.new(0, 0, 0, 0), UDim2.new(1, 0, 0, 30), COR_VERMELHO, 11)
+    killBtn.MouseButton1Click:Connect(function()
+        if selectedTarget and selectedTarget.Character and selectedTarget.Character:FindFirstChild("Humanoid") then
+            selectedTarget.Character.Humanoid.Health = 0
+        end
+    end)
+
+    -- Atalho Alt + W para abrir
+    UIS.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        if input.KeyCode == Enum.KeyCode.W and (UIS:IsKeyDown(Enum.KeyCode.LeftAlt) or UIS:IsKeyDown(Enum.KeyCode.RightAlt)) then
+            if unlocked then
+                panelOpen = not panelOpen
+                panel.Visible = panelOpen
+            else
+                prompt.Visible = not prompt.Visible
+            end
+        end
+    end)
+
+    enterBtn.MouseButton1Click:Connect(function()
+        if passBox.Text == PASSWORD then
+            unlocked = true
+            prompt.Visible = false
+            passBox.Text = ""
+            errLabel.Text = ""
+            
+            -- Salva a senha caso tenha sido alterada
+            config.cmdPassword = PASSWORD
+            saveConfig()
+
+            panel.Visible = true
+            panelOpen = true
+        else
+            errLabel.Text = "Senha incorreta!"
+        end
+    end)
+end
