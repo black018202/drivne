@@ -1,352 +1,319 @@
--- SERVICES
 local Players = game:GetService("Players")
 local UserInputService = game:GetService("UserInputService")
-local CoreGui = game:GetService("CoreGui")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local MessagingService = game:GetService("MessagingService")
+local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
--- CONFIGURAÇÃO DE REDE E SENHA
-local SCRIPT_FOLDER_NAME = "AnexushlRemoteNetwork_v2"
-local SCRIPT_PASSWORD = "anexushl"
+local PASSWORD_CORRECT = "anexushl"
+local NETWORK_TOPIC = "RemotePlayerControlNetwork_v1"
 
--- ESTADO DA SESSÃO
-local isUnlocked = false
-local activeUsers = {} -- [Player] = true
-local selectedTarget = nil
-local kickMessage = "Você foi removido pelo sistema remoto."
+local activeUsers = {} -- [UserId] = PlayerName
+local selectedTargetId = nil
+local isAuthenticated = false
 
--- CRIAR GUI PRINCIPAL NO COREGUI
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "RemoteControlGui"
-screenGui.ResetOnSpawn = false
-pcall(function()
-	screenGui.Parent = CoreGui
-end)
-if not screenGui.Parent then
-	screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-end
+-- ==================== CRIAÇÃO DA INTERFACE (GUI) ====================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "RemotePlayerControlGui"
+ScreenGui.ResetOnSpawn = false
+ScreenGui.Parent = PlayerGui
 
-----------------------------------------------------------------
--- 1. TELA DE SENHA (Alt + W)
-----------------------------------------------------------------
-local loginFrame = Instance.new("Frame")
-loginFrame.Name = "LoginFrame"
-loginFrame.Size = UDim2.new(0, 260, 0, 130)
-loginFrame.Position = UDim2.new(0.5, -130, 0.5, -65)
-loginFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-loginFrame.BorderSizePixel = 0
-loginFrame.Visible = false
-loginFrame.Parent = screenGui
+-- --- FRAME DE SENHA (ALT + W) ---
+local LoginFrame = Instance.new("Frame")
+LoginFrame.Name = "LoginFrame"
+LoginFrame.Size = UDim2.new(0, 300, 0, 160)
+LoginFrame.Position = UDim2.new(0.5, -150, 0.5, -80)
+LoginFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 30)
+LoginFrame.BorderSizePixel = 0
+LoginFrame.Visible = false
+LoginFrame.Parent = ScreenGui
 
-local loginCorner = Instance.new("UICorner")
-loginCorner.CornerRadius = UDim.new(0, 8)
-loginCorner.Parent = loginFrame
+local LoginCorner = Instance.new("UICorner")
+LoginCorner.CornerRadius = UDim.new(0, 8)
+LoginCorner.Parent = LoginFrame
 
-local loginTitle = Instance.new("TextLabel")
-loginTitle.Size = UDim2.new(1, 0, 0, 35)
-loginTitle.BackgroundTransparency = 1
-loginTitle.Text = "Acesso Restrito"
-loginTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
-loginTitle.TextSize = 16
-loginTitle.Font = Enum.Font.SourceSansBold
-loginTitle.Parent = loginFrame
+local LoginTitle = Instance.new("TextLabel")
+LoginTitle.Size = UDim2.new(1, 0, 0, 40)
+LoginTitle.BackgroundTransparency = 1
+LoginTitle.Text = "LOGIN REQUERIDO"
+LoginTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+LoginTitle.TextSize = 16
+LoginTitle.Font = Enum.Font.SourceSansBold
+LoginTitle.Parent = LoginFrame
 
-local passwordBox = Instance.new("TextBox")
-passwordBox.Size = UDim2.new(0.85, 0, 0, 35)
-passwordBox.Position = UDim2.new(0.075, 0, 0.45, 0)
-passwordBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-passwordBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-passwordBox.PlaceholderText = "Digite a senha..."
-passwordBox.Text = ""
-passwordBox.TextSize = 14
-passwordBox.Font = Enum.Font.SourceSans
-passwordBox.ClearTextOnFocus = false
-passwordBox.Parent = loginFrame
+local PasswordInput = Instance.new("TextBox")
+PasswordInput.Size = UDim2.new(0.85, 0, 0, 35)
+PasswordInput.Position = UDim2.new(0.075, 0, 0.3, 0)
+PasswordInput.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+PasswordInput.TextColor3 = Color3.fromRGB(255, 255, 255)
+PasswordInput.PlaceholderText = "Digite a senha..."
+PasswordInput.PlaceholderColor3 = Color3.fromRGB(150, 150, 150)
+PasswordInput.Text = ""
+PasswordInput.TextSize = 14
+PasswordInput.Font = Enum.Font.SourceSans
+PasswordInput.Parent = LoginFrame
 
-local boxCorner = Instance.new("UICorner")
-boxCorner.CornerRadius = UDim.new(0, 6)
-boxCorner.Parent = passwordBox
+local PassCorner = Instance.new("UICorner")
+PassCorner.CornerRadius = UDim.new(0, 6)
+PassCorner.Parent = PasswordInput
 
-----------------------------------------------------------------
--- 2. MENU PRINCIPAL (Tecla K)
-----------------------------------------------------------------
-local mainFrame = Instance.new("Frame")
-mainFrame.Name = "MainFrame"
-mainFrame.Size = UDim2.new(0, 480, 0, 350)
-mainFrame.Position = UDim2.new(0.5, -240, 0.5, -175)
-mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-mainFrame.BorderSizePixel = 0
-mainFrame.Visible = false
-mainFrame.Parent = screenGui
+local LoginBtn = Instance.new("TextButton")
+LoginBtn.Size = UDim2.new(0.85, 0, 0, 35)
+LoginBtn.Position = UDim2.new(0.075, 0, 0.62, 0)
+LoginBtn.BackgroundColor3 = Color3.fromRGB(0, 120, 215)
+LoginBtn.Text = "ENTRAR"
+LoginBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+LoginBtn.Font = Enum.Font.SourceSansBold
+LoginBtn.TextSize = 14
+LoginBtn.Parent = LoginFrame
 
-local mainCorner = Instance.new("UICorner")
-mainCorner.CornerRadius = UDim.new(0, 10)
-mainCorner.Parent = mainFrame
+local BtnCorner = Instance.new("UICorner")
+BtnCorner.CornerRadius = UDim.new(0, 6)
+BtnCorner.Parent = LoginBtn
 
-local mainTitle = Instance.new("TextLabel")
-mainTitle.Size = UDim2.new(1, 0, 0, 40)
-mainTitle.BackgroundTransparency = 1
-mainTitle.Text = "Painel de Controle Remoto - Anexushl"
-mainTitle.TextColor3 = Color3.fromRGB(0, 170, 255)
-mainTitle.TextSize = 18
-mainTitle.Font = Enum.Font.SourceSansBold
-mainTitle.Parent = mainFrame
+-- --- FRAME PRINCIPAL (TECLA K) ---
+local MainFrame = Instance.new("Frame")
+MainFrame.Name = "MainFrame"
+MainFrame.Size = UDim2.new(0, 450, 0, 320)
+MainFrame.Position = UDim2.new(0.5, -225, 0.5, -160)
+MainFrame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+MainFrame.BorderSizePixel = 0
+MainFrame.Visible = false
+MainFrame.Parent = ScreenGui
 
--- Lista de Usuários (ScrollingFrame)
-local userListContainer = Instance.new("ScrollingFrame")
-userListContainer.Size = UDim2.new(0, 200, 0, 220)
-userListContainer.Position = UDim2.new(0.04, 0, 0.15, 0)
-userListContainer.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-userListContainer.BorderSizePixel = 0
-userListContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
-userListContainer.Parent = mainFrame
+local MainCorner = Instance.new("UICorner")
+MainCorner.CornerRadius = UDim.new(0, 8)
+MainCorner.Parent = MainFrame
 
-local listLayout = Instance.new("UIListLayout")
-listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-listLayout.Padding = UDim.new(0, 5)
-listLayout.Parent = userListContainer
+local MainTitle = Instance.new("TextLabel")
+MainTitle.Size = UDim2.new(1, 0, 0, 40)
+MainTitle.BackgroundTransparency = 1
+MainTitle.Text = "PAINEL DE CONTROLE REMOTO"
+MainTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+MainTitle.TextSize = 18
+MainTitle.Font = Enum.Font.SourceSansBold
+MainTitle.Parent = MainFrame
+
+-- Lista de Usuários Detectados
+local UserScroll = Instance.new("ScrollingFrame")
+UserScroll.Size = UDim2.new(0, 180, 0, 250)
+UserScroll.Position = UDim2.new(0, 15, 0, 50)
+UserScroll.BackgroundColor3 = Color3.fromRGB(30, 30, 35)
+UserScroll.BorderSizePixel = 0
+UserScroll.CanvasSize = UDim2.new(0, 0, 0, 0)
+UserScroll.Parent = MainFrame
+
+local ScrollCorner = Instance.new("UICorner")
+ScrollCorner.CornerRadius = UDim.new(0, 6)
+ScrollCorner.Parent = UserScroll
+
+local UIListLayout = Instance.new("UIListLayout")
+UIListLayout.Parent = UserScroll
+UIListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+UIListLayout.Padding = UDim.new(0, 4)
 
 -- Painel de Ações
-local actionPanel = Instance.new("Frame")
-actionPanel.Size = UDim2.new(0, 220, 0, 220)
-actionPanel.Position = UDim2.new(0.52, 0, 0.15, 0)
-actionPanel.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-actionPanel.BorderSizePixel = 0
-actionPanel.Parent = mainFrame
+local ActionFrame = Instance.new("Frame")
+ActionFrame.Size = UDim2.new(0, 225, 0, 250)
+ActionFrame.Position = UDim2.new(0, 210, 0, 50)
+ActionFrame.BackgroundTransparency = 1
+ActionFrame.Parent = MainFrame
 
-local actionCorner = Instance.new("UICorner")
-actionCorner.CornerRadius = UDim.new(0, 6)
-actionCorner.Parent = actionPanel
+local TargetLabel = Instance.new("TextLabel")
+TargetLabel.Size = UDim2.new(1, 0, 0, 25)
+TargetLabel.BackgroundTransparency = 1
+TargetLabel.Text = "Alvo: Nenhum"
+TargetLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+TargetLabel.TextSize = 14
+TargetLabel.Font = Enum.Font.SourceSansBold
+TargetLabel.TextXAlignment = Enum.TextXAlignment.Left
+TargetLabel.Parent = ActionFrame
 
-local selectedLabel = Instance.new("TextLabel")
-selectedLabel.Size = UDim2.new(1, 0, 0, 30)
-selectedLabel.BackgroundTransparency = 1
-selectedLabel.Text = "Alvo: Nenhum"
-selectedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-selectedLabel.TextSize = 14
-selectedLabel.Font = Enum.Font.SourceSansBold
-selectedLabel.Parent = actionPanel
+local KillBtn = Instance.new("TextButton")
+KillBtn.Size = UDim2.new(1, 0, 0, 35)
+KillBtn.Position = UDim2.new(0, 0, 0, 35)
+KillBtn.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+KillBtn.Text = "KILL PLAYER"
+KillBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+KillBtn.Font = Enum.Font.SourceSansBold
+KillBtn.TextSize = 14
+KillBtn.Parent = ActionFrame
 
-local kickMsgBox = Instance.new("TextBox")
-kickMsgBox.Size = UDim2.new(0.9, 0, 0, 30)
-kickMsgBox.Position = UDim2.new(0.05, 0, 0.25, 0)
-kickMsgBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-kickMsgBox.TextColor3 = Color3.fromRGB(255, 255, 255)
-kickMsgBox.Text = kickMessage
-kickMsgBox.TextSize = 12
-kickMsgBox.Font = Enum.Font.SourceSans
-kickMsgBox.Parent = actionPanel
+local KillCorner = Instance.new("UICorner")
+KillCorner.CornerRadius = UDim.new(0, 6)
+KillCorner.Parent = KillBtn
 
-local killButton = Instance.new("TextButton")
-killButton.Size = UDim2.new(0.9, 0, 0, 35)
-killButton.Position = UDim2.new(0.05, 0, 0.5, 0)
-killButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
-killButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-killButton.Text = "MATAR (KILL)"
-killButton.TextSize = 14
-killButton.Font = Enum.Font.SourceSansBold
-killButton.Parent = actionPanel
+local KickReasonBox = Instance.new("TextBox")
+KickReasonBox.Size = UDim2.new(1, 0, 0, 35)
+KickReasonBox.Position = UDim2.new(0, 0, 0, 85)
+KickReasonBox.BackgroundColor3 = Color3.fromRGB(40, 40, 45)
+KickReasonBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+KickReasonBox.PlaceholderText = "Motivo do Kick..."
+KickReasonBox.Text = "Você foi desconectado pelo painel remoto."
+KickReasonBox.TextSize = 13
+KickReasonBox.Font = Enum.Font.SourceSans
+KickReasonBox.Parent = ActionFrame
 
-local killCorner = Instance.new("UICorner")
-killCorner.CornerRadius = UDim.new(0, 6)
-killCorner.Parent = killButton
+local KickReasonCorner = Instance.new("UICorner")
+KickReasonCorner.CornerRadius = UDim.new(0, 6)
+KickReasonCorner.Parent = KickReasonBox
 
-local kickButton = Instance.new("TextButton")
-kickButton.Size = UDim2.new(0.9, 0, 0, 35)
-kickButton.Position = UDim2.new(0.05, 0, 0.72, 0)
-kickButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
-kickButton.TextColor3 = Color3.fromRGB(255, 255, 255)
-kickButton.Text = "EXPULSAR (KICK)"
-kickButton.TextSize = 14
-kickButton.Font = Enum.Font.SourceSansBold
-kickButton.Parent = actionPanel
+local KickBtn = Instance.new("TextButton")
+KickBtn.Size = UDim2.new(1, 0, 0, 35)
+KickBtn.Position = UDim2.new(0, 0, 0, 130)
+KickBtn.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+KickBtn.Text = "KICK PLAYER"
+KickBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+KickBtn.Font = Enum.Font.SourceSansBold
+KickBtn.TextSize = 14
+KickBtn.Parent = ActionFrame
 
-local kickCorner = Instance.new("UICorner")
-kickCorner.CornerRadius = UDim.new(0, 6)
-kickCorner.Parent = kickButton
+local KickCorner = Instance.new("UICorner")
+KickCorner.CornerRadius = UDim.new(0, 6)
+KickCorner.Parent = KickBtn
 
-----------------------------------------------------------------
--- 3. SISTEMA DE DETECÇÃO COMPARTILHADA (SEM CHAT)
-----------------------------------------------------------------
--- Cria ou obtém uma pasta pública no ReplicatedStorage para os scripts se comunicarem
-local networkFolder = ReplicatedStorage:FindFirstChild(SCRIPT_FOLDER_NAME)
-if not networkFolder then
-	local newFolder = Instance.new("Folder")
-	newFolder.Name = SCRIPT_FOLDER_NAME
-	newFolder.Parent = ReplicatedStorage
-	networkFolder = newFolder
+-- ==================== REDE & COMUNICAÇÃO INTERNA ====================
+
+local function broadcast(action, payload)
+	pcall(function()
+		MessagingService:PublishAsync(NETWORK_TOPIC, {
+			SenderId = LocalPlayer.UserId,
+			SenderName = LocalPlayer.Name,
+			Action = action,
+			Payload = payload
+		})
+	end)
 end
 
-local function refreshUserList()
-	for _, child in ipairs(userListContainer:GetChildren()) do
+local function refreshUserListGUI()
+	for _, child in pairs(UserScroll:GetChildren()) do
 		if child:IsA("TextButton") then
 			child:Destroy()
 		end
 	end
 
-	local yOffset = 0
-	for player, _ in pairs(activeUsers) do
-		if player and player.Parent then
-			local userBtn = Instance.new("TextButton")
-			userBtn.Size = UDim2.new(1, -10, 0, 30)
-			userBtn.Position = UDim2.new(0, 5, 0, yOffset)
-			userBtn.BackgroundColor3 = (selectedTarget == player) and Color3.fromRGB(0, 120, 215) or Color3.fromRGB(50, 50, 50)
-			userBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-			userBtn.Text = player.Name
-			userBtn.TextSize = 13
-			userBtn.Font = Enum.Font.SourceSans
-			userBtn.Parent = userListContainer
+	local count = 0
+	for userId, userName in pairs(activeUsers) do
+		count = count + 1
+		local UserBtn = Instance.new("TextButton")
+		UserBtn.Size = UDim2.new(1, -8, 0, 30)
+		UserBtn.BackgroundColor3 = (selectedTargetId == userId) and Color3.fromRGB(0, 120, 215) or Color3.fromRGB(45, 45, 50)
+		UserBtn.Text = userName
+		UserBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+		UserBtn.Font = Enum.Font.SourceSans
+		UserBtn.TextSize = 14
+		UserBtn.Parent = UserScroll
 
-			userBtn.MouseButton1Click:Connect(function()
-				selectedTarget = player
-				selectedLabel.Text = "Alvo: " .. player.Name
-				refreshUserList()
-			end)
+		local Corner = Instance.new("UICorner")
+		Corner.CornerRadius = UDim.new(0, 4)
+		Corner.Parent = UserBtn
 
-			yOffset = yOffset + 35
-		end
+		UserBtn.MouseButton1Click:Connect(function()
+			selectedTargetId = userId
+			TargetLabel.Text = "Alvo: " .. userName
+			refreshUserListGUI()
+		end)
 	end
-	userListContainer.CanvasSize = UDim2.new(0, 0, 0, yOffset)
+
+	UserScroll.CanvasSize = UDim2.new(0, 0, 0, count * 34)
 end
 
--- Registrar o próprio jogador criando um objeto na pasta compartilhada
-local myUserMarker = Instance.new("StringValue")
-myUserMarker.Name = LocalPlayer.Name
-myUserMarker.Value = "ONLINE"
-myUserMarker.Parent = networkFolder
+-- Escutar mensagens de outros scripts na mesma rede
+pcall(function()
+	MessagingService:SubscribeAsync(NETWORK_TOPIC, function(message)
+		local data = message.Data
+		if not data or type(data) ~= "table" then return end
 
--- Monitorar quem entra e sai na pasta compartilhada
-networkFolder.ChildAdded:Connect(function(child)
-	if child:IsA("StringValue") then
-		local p = Players:FindFirstChild(child.Name)
-		if p then
-			activeUsers[p] = true
-			refreshUserList()
-		end
-	end
-end)
-
-networkFolder.ChildRemoved:Connect(function(child)
-	if child:IsA("StringValue") then
-		local p = Players:FindFirstChild(child.Name)
-		if p and p ~= LocalPlayer then
-			activeUsers[p] = nil
-			if selectedTarget == p then
-				selectedTarget = nil
-				selectedLabel.Text = "Alvo: Nenhum"
+		-- Detectar anúncio de presença
+		if data.Action == "Announce" then
+			if not activeUsers[data.SenderId] then
+				activeUsers[data.SenderId] = data.SenderName
+				refreshUserListGUI()
+				-- Responder para que o novo usuário também saiba que existimos
+				broadcast("PingBack", {})
 			end
-			refreshUserList()
-		end
-	end
-end)
 
--- Carregar quem já está na pasta ao iniciar
-for _, child in ipairs(networkFolder:GetChildren()) do
-	if child:IsA("StringValue") then
-		local p = Players:FindFirstChild(child.Name)
-		if p then
-			activeUsers[p] = true
-		end
-	end
-end
-
--- Sistema para receber comandos de Kill / Kick via atributos na pasta
-networkFolder.AttributeChanged:Connect(function(attributeName)
-	local data = networkFolder:GetAttribute(attributeName)
-	if type(data) == "table" then
-		if data.action == "KILL" and data.target == LocalPlayer.Name then
-			local char = LocalPlayer.Character
-			if char and char:FindFirstChild("Humanoid") then
-				char.Humanoid.Health = 0
+		elseif data.Action == "PingBack" then
+			if not activeUsers[data.SenderId] then
+				activeUsers[data.SenderId] = data.SenderName
+				refreshUserListGUI()
 			end
-		elseif data.action == "KICK" and data.target == LocalPlayer.Name then
-			LocalPlayer:Kick(data.message or kickMessage)
-		end
-	end
-end)
 
-----------------------------------------------------------------
--- 4. CONTROLES E ATALHOS DE TECLADO
-----------------------------------------------------------------
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	-- Alt + W (Menu de Senha)
-	if UserInputService:IsKeyDown(Enum.KeyCode.LeftAlt) or UserInputService:IsKeyDown(Enum.KeyCode.RightAlt) then
-		if input.KeyCode == Enum.KeyCode.W then
-			if not isUnlocked then
-				loginFrame.Visible = not loginFrame.Visible
-				if loginFrame.Visible then
-					passwordBox.Text = ""
-					passwordBox:CaptureFocus()
+		-- Receber ordens de Kill
+		elseif data.Action == "KillCommand" then
+			if data.Payload.TargetId == LocalPlayer.UserId then
+				if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
+					LocalPlayer.Character.Humanoid.Health = 0
 				end
 			end
+
+		-- Receber ordens de Kick
+		elseif data.Action == "KickCommand" then
+			if data.Payload.TargetId == LocalPlayer.UserId then
+				local msg = data.Payload.Reason or "Você foi desconectado."
+				LocalPlayer:Kick("\n[PAINEL REMOTO]\n" .. msg)
+			end
+		end
+	end)
+end)
+
+-- Anuncia este usuário na rede ao rodar
+activeUsers[LocalPlayer.UserId] = LocalPlayer.Name
+broadcast("Announce", {})
+
+-- ==================== EVENTOS & LÓGICA ====================
+
+local function tryLogin()
+	if PasswordInput.Text == PASSWORD_CORRECT then
+		isAuthenticated = true
+		LoginFrame.Visible = false
+		MainFrame.Visible = true
+		refreshUserListGUI()
+	else
+		PasswordInput.Text = ""
+		PasswordInput.PlaceholderText = "Senha Incorreta!"
+	end
+end
+
+LoginBtn.MouseButton1Click:Connect(tryLogin)
+PasswordInput.FocusLost:Connect(function(enterPressed)
+	if enterPressed then
+		tryLogin()
+	end
+end)
+
+-- Atalhos de Teclado
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+
+	-- Alt + W (Menu de Senha)
+	if input.KeyCode == Enum.KeyCode.W and UserInputService:IsKeyDown(Enum.KeyCode.LeftAlt) then
+		if not isAuthenticated then
+			LoginFrame.Visible = not LoginFrame.Visible
 		end
 	end
 
 	-- Tecla K (Abrir/Fechar Menu Principal)
-	if input.KeyCode == Enum.KeyCode.K and isUnlocked then
-		mainFrame.Visible = not mainFrame.Visible
-		if mainFrame.Visible then
-			refreshUserList()
+	if input.KeyCode == Enum.KeyCode.K then
+		if isAuthenticated then
+			MainFrame.Visible = not MainFrame.Visible
 		end
 	end
 end)
 
--- Validação da Senha
-passwordBox.FocusLost:Connect(function(enterPressed)
-	if enterPressed then
-		if passwordBox.Text == SCRIPT_PASSWORD then
-			isUnlocked = true
-			loginFrame.Visible = false -- Fecha o painel de senha de vez
-			mainFrame.Visible = true    -- Abre o menu principal
-			passwordBox.Text = ""
-			refreshUserList()
-		else
-			passwordBox.Text = ""
-			passwordBox.PlaceholderText = "Senha incorreta!"
-			task.wait(1)
-			passwordBox.PlaceholderText = "Digite a senha..."
-		end
+-- Botão Kill
+KillBtn.MouseButton1Click:Connect(function()
+	if selectedTargetId then
+		broadcast("KillCommand", { TargetId = selectedTargetId })
 	end
 end)
 
-----------------------------------------------------------------
--- 5. AÇÕES DE KILL E KICK DIRETAS DO SCRIPT
-----------------------------------------------------------------
-killButton.MouseButton1Click:Connect(function()
-	if selectedTarget then
-		if selectedTarget == LocalPlayer then
-			local char = LocalPlayer.Character
-			if char and char:FindFirstChild("Humanoid") then
-				char.Humanoid.Health = 0
-			end
-		else
-			networkFolder:SetAttribute("Cmd_" .. math.random(1000, 9999), {
-				action = "KILL",
-				target = selectedTarget.Name
-			})
-		end
+-- Botão Kick
+KickBtn.MouseButton1Click:Connect(function()
+	if selectedTargetId then
+		local reason = KickReasonBox.Text
+		if reason == "" then reason = "Você foi desconectado do jogo." end
+		broadcast("KickCommand", { TargetId = selectedTargetId, Reason = reason })
 	end
 end)
-
-kickMsgBox.FocusLost:Connect(function()
-	if kickMsgBox.Text ~= "" then
-		kickMessage = kickMsgBox.Text
-	end
-end)
-
-kickButton.MouseButton1Click:Connect(function()
-	if selectedTarget then
-		if selectedTarget == LocalPlayer then
-			LocalPlayer:Kick(kickMessage)
-		else
-            networkFolder:SetAttribute("Cmd_" .. math.random(1000, 9999), {
-				action = "KICK",
-				target = selectedTarget.Name,
-				message = kickMessage
-			})
-		end
-	end
-end)
-
-refreshUserList()
