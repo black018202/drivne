@@ -6,7 +6,7 @@ local CoreGui = game:GetService("CoreGui")
 
 local LocalPlayer = Players.LocalPlayer
 
--- CONFIGURAÇÃO DE REDE (Comunicação entre usuários do script)
+-- CONFIGURAÇÃO DE REDE
 local COMMUNICATION_CHANNEL = "AnexushlRemoteControl_Network_v1"
 local SCRIPT_PASSWORD = "anexushl"
 
@@ -16,7 +16,7 @@ local activeUsers = {} -- [Player] = true
 local selectedTarget = nil
 local kickMessage = "Você foi removido pelo sistema remoto."
 
--- CRIAR GUI PRINCIPAL NO COREGUI (ou PlayerGui)
+-- CRIAR GUI PRINCIPAL NO COREGUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "RemoteControlGui"
 screenGui.ResetOnSpawn = false
@@ -107,7 +107,7 @@ listLayout.SortOrder = Enum.SortOrder.LayoutOrder
 listLayout.Padding = UDim.new(0, 5)
 listLayout.Parent = userListContainer
 
--- Painel de Ações e Configurações
+-- Painel de Ações
 local actionPanel = Instance.new("Frame")
 actionPanel.Size = UDim2.new(0, 220, 0, 220)
 actionPanel.Position = UDim2.new(0.52, 0, 0.15, 0)
@@ -167,14 +167,8 @@ kickCorner.CornerRadius = UDim.new(0, 6)
 kickCorner.Parent = kickButton
 
 ----------------------------------------------------------------
--- 3. SISTEMA DE COMUNICAÇÃO USANDO MENSAGENS DO SCRIPT
+-- 3. DETECÇÃO E REDE ENTRE JOGADORES DO SCRIPT
 ----------------------------------------------------------------
--- Como executamos em Client (LocalScript), usamos RemoteEvent se existir no jogo ou BindableEvent/LogService truques. 
--- Nota: Para comunicação global entre clientes no Roblox sem RemoteEvent de servidor, usamos 
--- um canal de chat oculto ou TextChatService/ReplicatedStorage se houver espaço. 
--- Como o prompt pede que o script faça tudo por si só, criamos um canal via ReplicatedStorage dinâmico se possível, 
--- ou simulamos a detecção localmente para testes. Vamos criar um canal seguro via ReplicatedStorage:
-
 local remoteEvent = ReplicatedStorage:FindFirstChild(COMMUNICATION_CHANNEL)
 if not remoteEvent then
 	local possibleEvent = Instance.new("RemoteEvent")
@@ -183,7 +177,6 @@ if not remoteEvent then
 	remoteEvent = possibleEvent
 end
 
--- Função para atualizar a lista visual de usuários conectados com o script
 local function refreshUserList()
 	for _, child in ipairs(userListContainer:GetChildren()) do
 		if child:IsA("TextButton") then
@@ -216,61 +209,72 @@ local function refreshUserList()
 	userListContainer.CanvasSize = UDim2.new(0, 0, 0, yOffset)
 end
 
--- Registrar a si mesmo como usuário ativo
+-- Incluir o próprio jogador na lista
 activeUsers[LocalPlayer] = true
 
-remoteEvent.OnClientEvent:Connect(function(action, sender, data)
-	if action == "ANNOUNCE" then
-		local targetPlayer = Players:FindFirstChild(sender)
-		if targetPlayer then
-			activeUsers[targetPlayer] = true
+-- Tratar desconexão de jogadores
+Players.PlayerRemoving:Connect(function(player)
+	if activeUsers[player] then
+		activeUsers[player] = nil
+		if selectedTarget == player then
+			selectedTarget = nil
+			selectedLabel.Text = "Alvo: Nenhum"
+		end
+		refreshUserList()
+	end
+end)
+
+-- Eventos do cliente
+remoteEvent.OnClientEvent:Connect(function(action, senderName, targetData)
+	local senderPlayer = Players:FindFirstChild(senderName)
+
+	if action == "PING" or action == "ANNOUNCE" then
+		if senderPlayer then
+			activeUsers[senderPlayer] = true
 			refreshUserList()
 		end
-	elseif action == "KILL" and data == LocalPlayer.Name then
-		-- Executa o Kill Interno do Script
+	elseif action == "GET_USERS" then
+		-- Alguém novo entrou, envia nossa presença de volta
+		remoteEvent:FireServer("ANNOUNCE", LocalPlayer.Name)
+	elseif action == "KILL" and targetData == LocalPlayer.Name then
 		local char = LocalPlayer.Character
 		if char and char:FindFirstChild("Humanoid") then
 			char.Humanoid.Health = 0
 		end
-	elseif action == "KICK" and data.target == LocalPlayer.Name then
-		-- Executa o Kick Interno do Script
-		LocalPlayer:Kick(data.message)
+	elseif action == "KICK" and type(targetData) == "table" and targetData.target == LocalPlayer.Name then
+		LocalPlayer:Kick(targetData.message or kickMessage)
 	end
 end)
 
--- Anunciar entrada para os outros servidores
+-- Solicitar e responder presença na rede
 task.spawn(function()
-	while true do
-		remoteEvent:FireServer("ANNOUNCE", LocalPlayer.Name)
-		task.wait(5)
+	task.wait(1)
+	remoteEvent:FireServer("GET_USERS", LocalPlayer.Name)
+	remoteEvent:FireServer("ANNOUNCE", LocalPlayer.Name)
+	
+	while task.wait(4) do
+		remoteEvent:FireServer("PING", LocalPlayer.Name)
 	end
-end)
-
--- (Se for executado no servidor ou via exploit hook de RemoteEvent do cliente:)
--- Caso o jogo bloqueie FireServer livre, adicionamos tratamento:
-pcall(function()
-	remoteEvent.OnServerEvent:Connect(function(player, action, data)
-		remoteEvent:FireAllClients(action, player.Name, data)
-	end)
 end)
 
 ----------------------------------------------------------------
--- 4. CONTROLES DE TECLADO E INTERAÇÃO
+-- 4. CONTROLES E ATALHOS DE TECLADO
 ----------------------------------------------------------------
 UserInputService.InputBegan:Connect(function(input, gameProcessed)
-	-- Alt + W (Abrir menu de senha)
+	-- Alt + W (Menu de Senha)
 	if UserInputService:IsKeyDown(Enum.KeyCode.LeftAlt) or UserInputService:IsKeyDown(Enum.KeyCode.RightAlt) then
 		if input.KeyCode == Enum.KeyCode.W then
 			if not isUnlocked then
 				loginFrame.Visible = not loginFrame.Visible
 				if loginFrame.Visible then
+					passwordBox.Text = ""
 					passwordBox:CaptureFocus()
 				end
 			end
 		end
 	end
 
-	-- Tecla K (Abrir/Fechar menu principal se desbloqueado)
+	-- Tecla K (Abrir/Fechar menu principal se já liberado pela senha)
 	if input.KeyCode == Enum.KeyCode.K and isUnlocked then
 		mainFrame.Visible = not mainFrame.Visible
 		if mainFrame.Visible then
@@ -279,13 +283,14 @@ UserInputService.InputBegan:Connect(function(input, gameProcessed)
 	end
 end)
 
--- Validação da Senha ao apertar Enter
+-- Validação de Senha no Enter
 passwordBox.FocusLost:Connect(function(enterPressed)
 	if enterPressed then
 		if passwordBox.Text == SCRIPT_PASSWORD then
 			isUnlocked = true
-			loginFrame.Visible = false
-			mainFrame.Visible = true
+			loginFrame.Visible = false -- Oculta a caixa de senha
+			mainFrame.Visible = true    -- Abre a interface principal
+			passwordBox.Text = ""
 			refreshUserList()
 		else
 			passwordBox.Text = ""
@@ -296,35 +301,37 @@ passwordBox.FocusLost:Connect(function(enterPressed)
 	end
 end)
 
--- Botão de Kill
+----------------------------------------------------------------
+-- 5. AÇÕES DE KILL E KICK
+----------------------------------------------------------------
 killButton.MouseButton1Click:Connect(function()
 	if selectedTarget then
-		remoteEvent:FireServer("KILL", LocalPlayer.Name, selectedTarget.Name)
-		-- Também aciona diretamente se for o próprio cliente simulando
 		if selectedTarget == LocalPlayer then
 			local char = LocalPlayer.Character
 			if char and char:FindFirstChild("Humanoid") then
 				char.Humanoid.Health = 0
 			end
+		else
+			remoteEvent:FireServer("KILL", LocalPlayer.Name, selectedTarget.Name)
 		end
 	end
 end)
 
--- Atualizar mensagem personalizada de Kick
 kickMsgBox.FocusLost:Connect(function()
-	kickMessage = kickMsgBox.Text
+	if kickMsgBox.Text ~= "" then
+		kickMessage = kickMsgBox.Text
+	end
 end)
 
--- Botão de Kick
 kickButton.MouseButton1Click:Connect(function()
 	if selectedTarget then
-		local kickData = {
-			target = selectedTarget.Name,
-			message = kickMessage
-		}
-		remoteEvent:FireServer("KICK", LocalPlayer.Name, kickData)
 		if selectedTarget == LocalPlayer then
 			LocalPlayer:Kick(kickMessage)
+		else
+			remoteEvent:FireServer("KICK", LocalPlayer.Name, {
+				target = selectedTarget.Name,
+				message = kickMessage
+			})
 		end
 	end
 end)
